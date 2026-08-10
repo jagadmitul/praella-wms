@@ -87,7 +87,7 @@ Seeded by `pnpm db:seed`. **Password for every account: `Praella@2026`**
 
 Signing in as **Staff** is the quickest way to see the access control working: the sidebar loses entries, the stock page loses its "Adjust stock" and "Set threshold" buttons, and only one warehouse's rows are returned.
 
-The seed creates 2 organisations, 5 users, 4 warehouses, 23 products, 67 stock levels, **379 stock movements across 30 days**, 4 purchase orders, 4 sales orders and 1 completed transfer — with 9 lines deliberately below their replenishment threshold so the low-stock features have something to show.
+The seed creates 2 organisations, 5 users, 4 warehouses, 23 products, 67 stock levels, **375 stock movements across 30 days** (covering all five movement types), 4 purchase orders, 4 sales orders and 1 completed transfer — with 8 lines deliberately below their replenishment threshold so the low-stock features have something to show.
 
 ---
 
@@ -277,7 +277,7 @@ it('never lets concurrent dispatches drive stock negative', async () => {
 Two options, both included:
 
 1. **`pnpm db:seed`** — runs `apps/api/prisma/seed.ts`. Deterministic (seeded PRNG), so every run produces identical data.
-2. **`sample-data.sql`** — 534 rows across 19 tables as plain `INSERT` statements, wrapped in a transaction and idempotent:
+2. **`sample-data.sql`** — 530 rows across 19 tables as plain `INSERT` statements, wrapped in a transaction and idempotent:
 
    ```bash
    pnpm db:deploy                              # schema first
