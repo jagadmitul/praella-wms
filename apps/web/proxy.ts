@@ -7,7 +7,13 @@ const REFRESH_TOKEN_COOKIE = 'wms_refresh';
 /** Refresh this many seconds before the access token actually expires. */
 const REFRESH_MARGIN_SECONDS = 60;
 
-const PUBLIC_PATHS = ['/login', '/signup'];
+const PUBLIC_PATHS = [
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/invitations',
+];
 
 /**
 * Keeps the session alive and guards the dashboard.

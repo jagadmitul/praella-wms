@@ -1,9 +1,10 @@
-import { Sidebar } from '@/components/layout/sidebar';
-import { Topbar } from '@/components/layout/topbar';
+import { AppShell } from '@/components/layout/app-shell';
+import { buttonClass } from '@/components/ui';
+import { signOutAction } from '@/lib/actions/auth';
 import { getSession } from '@/lib/queries';
 
 /**
- * Authenticated shell. The session is fetched once here and the permission list
+ * Authenticated shell. The session is fetched once here and its permission list
  * drives the navigation, so every page below can assume a signed-in user.
  */
 export default async function DashboardLayout({
@@ -12,24 +13,23 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const session = await getSession();
-  const organizationName =
-    session.user.memberships.find(
-      (membership) => membership.organizationId === session.activeOrganizationId,
-    )?.organizationName ?? 'Your organisation';
+
+  // Rendered here so the sign-out Server Action stays on the server side of the
+  // boundary, and handed to the client shell as a slot.
+  const signOut = (
+    <form action={signOutAction}>
+      <button
+        type="submit"
+        className={buttonClass('secondary', 'px-2.5 py-1.5 text-xs whitespace-nowrap')}
+      >
+        Sign out
+      </button>
+    </form>
+  );
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar
-        permissions={[...session.permissions]}
-        organizationName={organizationName}
-      />
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar session={session} />
-        <main className="flex-1 overflow-y-auto px-8 py-7">
-          <div className="mx-auto max-w-[1400px]">{children}</div>
-        </main>
-      </div>
-    </div>
+    <AppShell session={session} signOut={signOut}>
+      {children}
+    </AppShell>
   );
 }

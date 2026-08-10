@@ -55,9 +55,9 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div className="mb-5 flex flex-col gap-4 sm:mb-6 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink-900">{title}</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-ink-900 sm:text-2xl">{title}</h1>
         {description ? (
           <p className="mt-1 max-w-2xl text-sm text-ink-500">{description}</p>
         ) : null}
@@ -127,10 +127,16 @@ export function StatusBadge({ status }: { status: string }) {
 
 /* --------------------------------- Tables -------------------------------- */
 
+/**
+ * Dense data tables scroll horizontally inside their own container rather than
+ * reflowing into cards on small screens. For an operations console that is the
+ * right trade: a picker comparing on-hand against reserved needs the columns
+ * side by side, and the page body itself never scrolls sideways.
+ */
 export function Table({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] border-collapse text-sm">{children}</table>
+    <div className="w-full overflow-x-auto overscroll-x-contain">
+      <table className="w-full min-w-[44rem] border-collapse text-sm">{children}</table>
     </div>
   );
 }

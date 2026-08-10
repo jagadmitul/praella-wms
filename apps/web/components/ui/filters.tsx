@@ -49,7 +49,7 @@ export function SearchFilter({ placeholder = 'Search…' }: { placeholder?: stri
   return (
     <form
       role="search"
-      className="flex items-center gap-2"
+      className="flex w-full items-center gap-2 sm:w-auto"
       onSubmit={(event) => {
         event.preventDefault();
         const value = new FormData(event.currentTarget).get('search');
@@ -62,7 +62,7 @@ export function SearchFilter({ placeholder = 'Search…' }: { placeholder?: stri
         defaultValue={searchParams.get('search') ?? ''}
         placeholder={placeholder}
         aria-label={placeholder}
-        className={cn('field w-64', isPending && 'opacity-70')}
+        className={cn('field w-full sm:w-64', isPending && 'opacity-70')}
       />
       <button type="submit" className={buttonClass('secondary')}>
         Search
@@ -85,13 +85,13 @@ export function SelectFilter({
   const { update, isPending, searchParams } = useQueryUpdater();
 
   return (
-    <label className="flex items-center gap-2 text-xs text-ink-500">
+    <label className="flex w-full items-center gap-2 text-xs text-ink-500 sm:w-auto">
       <span className="sr-only sm:not-sr-only">{label}</span>
       <select
         value={searchParams.get(name) ?? ''}
         onChange={(event) => update({ [name]: event.target.value || undefined })}
         aria-label={label}
-        className={cn('field w-auto min-w-40 py-1.5', isPending && 'opacity-70')}
+        className={cn('field w-full py-1.5 sm:w-auto sm:min-w-40', isPending && 'opacity-70')}
       >
         <option value="">{allLabel}</option>
         {options.map((option) => (

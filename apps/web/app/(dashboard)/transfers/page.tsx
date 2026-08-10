@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import { Card, EmptyState, PageHeader, StatusBadge, Table, Td, Th } from '@/components/ui';
 import { Pagination, SearchFilter, SelectFilter } from '@/components/ui/filters';
 import { TransitionButton } from '@/components/ui/transition-button';
-import { getSession, getTransfers } from '@/lib/queries';
+import { DocumentComposer } from '@/components/orders/document-composer';
+import { getProducts, getSession, getTransfers, getWarehouses } from '@/lib/queries';
 import { formatDate, formatNumber } from '@/lib/format';
+import { createTransferAction } from '@/lib/actions/orders';
 
 export const metadata: Metadata = { title: 'Transfers' };
 
@@ -22,9 +24,11 @@ export default async function TransfersPage({
   const params = await searchParams;
   const page = Number(params.page ?? 1);
 
-  const [session, transfers] = await Promise.all([
+  const [session, transfers, products, warehouses] = await Promise.all([
     getSession(),
     getTransfers({ search: params.search, page, pageSize: 20, status: params.status }),
+    getProducts({ pageSize: 100, sortBy: 'name', sortDir: 'asc' }),
+    getWarehouses(),
   ]);
 
   const canTransfer = (session.permissions as string[]).includes('stock:transfer');
@@ -34,6 +38,27 @@ export default async function TransfersPage({
       <PageHeader
         title="Stock transfers"
         description="Warehouse-to-warehouse moves. Stock leaves the source on dispatch and arrives on receipt, so goods in transit are correctly absent from both sites."
+        action={
+          canTransfer ? (
+            <DocumentComposer
+              kind="transfer"
+              trigger="New transfer"
+              title="Create a stock transfer"
+              description="Raised as a draft. Dispatch removes stock from the source; receiving adds it to the destination."
+              action={createTransferAction}
+              products={products.items.map((product) => ({
+                id: product.id,
+                label: `${product.sku} — ${product.name}`,
+                unitPrice: product.unitPrice,
+                unit: product.unit,
+              }))}
+              warehouses={warehouses.items.map((warehouse) => ({
+                id: warehouse.id,
+                label: `${warehouse.code} — ${warehouse.name}`,
+              }))}
+            />
+          ) : null
+        }
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">

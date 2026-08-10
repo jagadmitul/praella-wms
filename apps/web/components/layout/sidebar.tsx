@@ -73,7 +73,7 @@ export function Sidebar({
   return (
     <nav
       aria-label="Primary"
-      className="flex h-full w-60 shrink-0 flex-col border-r border-ink-800 bg-ink-900"
+      className="flex h-full w-64 shrink-0 flex-col border-r border-ink-800 bg-ink-900 lg:w-60"
     >
       <div className="flex items-center gap-2.5 px-5 py-5">
         <span

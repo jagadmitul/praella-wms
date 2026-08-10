@@ -49,7 +49,16 @@ export default async function LoginPage({
         ]}
       />
 
-      <p className="mt-6 text-sm text-ink-500">
+      <p className="mt-4 text-sm text-ink-500">
+        <Link
+          href="/forgot-password"
+          className="font-medium text-brand-600 hover:text-brand-700"
+        >
+          Forgot your password?
+        </Link>
+      </p>
+
+      <p className="mt-2 text-sm text-ink-500">
         Need an organisation?{' '}
         <Link href="/signup" className="font-medium text-brand-600 hover:text-brand-700">
           Create one

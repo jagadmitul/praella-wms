@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import { Card, EmptyState, PageHeader, StatusBadge, Table, Td, Th } from '@/components/ui';
 import { Pagination, SearchFilter, SelectFilter } from '@/components/ui/filters';
 import { TransitionButton } from '@/components/ui/transition-button';
-import { getSalesOrders, getSession } from '@/lib/queries';
+import { DocumentComposer } from '@/components/orders/document-composer';
+import { getProducts, getSalesOrders, getSession, getWarehouses } from '@/lib/queries';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/format';
+import { createSalesOrderAction } from '@/lib/actions/orders';
 
 export const metadata: Metadata = { title: 'Sales orders' };
 
@@ -23,9 +25,11 @@ export default async function SalesOrdersPage({
   const params = await searchParams;
   const page = Number(params.page ?? 1);
 
-  const [session, orders] = await Promise.all([
+  const [session, orders, products, warehouses] = await Promise.all([
     getSession(),
     getSalesOrders({ search: params.search, page, pageSize: 20, status: params.status }),
+    getProducts({ pageSize: 100, sortBy: 'name', sortDir: 'asc' }),
+    getWarehouses(),
   ]);
 
   const permissions = session.permissions as string[];
@@ -38,6 +42,27 @@ export default async function SalesOrdersPage({
       <PageHeader
         title="Sales orders"
         description="Outbound stock. Allocating reserves units without moving them, so two orders can never promise the same last item; fulfilment turns that reservation into a real dispatch."
+        action={
+          canManage ? (
+            <DocumentComposer
+              kind="sales"
+              trigger="New sales order"
+              title="Create a sales order"
+              description="Raised as a draft. Allocate it to reserve stock, then fulfil to ship."
+              action={createSalesOrderAction}
+              products={products.items.map((product) => ({
+                id: product.id,
+                label: `${product.sku} — ${product.name}`,
+                unitPrice: product.unitPrice,
+                unit: product.unit,
+              }))}
+              warehouses={warehouses.items.map((warehouse) => ({
+                id: warehouse.id,
+                label: `${warehouse.code} — ${warehouse.name}`,
+              }))}
+            />
+          ) : null
+        }
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
