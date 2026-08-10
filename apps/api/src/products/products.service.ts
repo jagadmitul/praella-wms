@@ -12,6 +12,7 @@ import { AuditService } from '../common/services/audit.service';
 import { buildOrderBy, paginate, toPrismaPage } from '../common/utils/pagination.util';
 import { toMoneyString } from '../common/utils/decimal.util';
 import { warehouseScopeFilter } from '../common/utils/warehouse-scope.util';
+import { belowThresholdFilter } from '../stock/stock.service';
 import type { OrgContext } from '../common/types/request-context';
 import type { Prisma } from '../generated/prisma/client';
 
@@ -77,16 +78,14 @@ export class ProductsService {
       ...(query.warehouseId || scope
         ? { stockLevels: { some: warehouseFilter } }
         : {}),
+      // The threshold test compares two columns, which Prisma expresses as a
+      // field reference — so it runs in Postgres and this endpoint paginates
+      // correctly. Filtering in JavaScript after the page was taken, as an
+      // earlier version did, reported a `totalItems` that did not match.
       ...(query.lowStockOnly
         ? {
             stockLevels: {
-              some: {
-                ...warehouseFilter,
-                reorderPoint: { gt: 0 },
-                // Postgres cannot compare two columns in a Prisma filter, so
-                // the threshold test is finished in `toView` below. The filter
-                // still narrows the candidate set to rows with a threshold set.
-              },
+              some: { ...warehouseFilter, ...belowThresholdFilter(this.prisma) },
             },
           }
         : {}),
@@ -108,12 +107,7 @@ export class ProductsService {
       this.prisma.product.count({ where }),
     ]);
 
-    const views = rows.map(ProductsService.toView);
-    const filtered = query.lowStockOnly
-      ? views.filter((product) => product.isBelowThreshold)
-      : views;
-
-    return paginate(filtered, query.lowStockOnly ? filtered.length : totalItems, query);
+    return paginate(rows.map(ProductsService.toView), totalItems, query);
   }
 
   /**

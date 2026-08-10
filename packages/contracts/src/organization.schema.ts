@@ -33,3 +33,17 @@ export const memberQuerySchema = paginationQuerySchema.extend({
   role: roleSchema.optional(),
 });
 export type MemberQuery = z.infer<typeof memberQuerySchema>;
+
+/**
+ * Invites a collaborator by email. Unlike `inviteMemberSchema`, which creates
+ * the account immediately with a temporary password, this issues a signed,
+ * expiring link and creates nothing until the invitee accepts.
+ */
+export const createInvitationSchema = z.object({
+  email: emailSchema,
+  fullName: shortTextSchema,
+  role: roleSchema,
+  /** Warehouses a STAFF invitee will be scoped to. Ignored for other roles. */
+  warehouseIds: z.array(idSchema).optional(),
+});
+export type CreateInvitationInput = z.infer<typeof createInvitationSchema>;

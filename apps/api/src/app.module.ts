@@ -9,6 +9,8 @@ import { CommonModule } from './common/common.module';
 import { CacheModule } from './cache/cache.module';
 import { AuthModule } from './auth/auth.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { InvitationsModule } from './invitations/invitations.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { WarehousesModule } from './warehouses/warehouses.module';
 import { CatalogueModule } from './catalogue/catalogue.module';
 import { ProductsModule } from './products/products.module';
@@ -16,8 +18,10 @@ import { StockModule } from './stock/stock.module';
 import { TransfersModule } from './transfers/transfers.module';
 import { OrdersModule } from './orders/orders.module';
 import { ReportsModule } from './reports/reports.module';
+import { ExportsModule } from './exports/exports.module';
 import { JobsModule } from './jobs/jobs.module';
 import { HealthModule } from './health/health.module';
+import { ObservabilityModule } from './observability/observability.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -61,11 +65,14 @@ const queueModules = process.env.REDIS_ENABLED === 'false' ? [] : [JobsModule];
         ],
       }),
     }),
+    ObservabilityModule,
     PrismaModule,
     CommonModule,
     CacheModule,
+    NotificationsModule,
     AuthModule,
     OrganizationsModule,
+    InvitationsModule,
     WarehousesModule,
     CatalogueModule,
     ProductsModule,
@@ -73,6 +80,7 @@ const queueModules = process.env.REDIS_ENABLED === 'false' ? [] : [JobsModule];
     TransfersModule,
     OrdersModule,
     ReportsModule,
+    ExportsModule,
     HealthModule,
     ...queueModules,
   ],

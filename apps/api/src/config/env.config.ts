@@ -32,6 +32,13 @@ const envSchema = z
     /** Namespaces BullMQ keys so separate environments never share a queue. */
     QUEUE_PREFIX: z.string().min(1).default('wms'),
 
+    /** Public URL of the dashboard, used to build invite and reset links. */
+    APP_URL: z.string().url().default('http://localhost:3300'),
+    /** Email transport. `console` logs messages instead of sending them. */
+    MAIL_TRANSPORT: z.enum(['console']).default('console'),
+    /** `json` emits one JSON object per log line; defaults to json in production. */
+    LOG_FORMAT: z.enum(['pretty', 'json']).optional(),
+
     JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
     JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
     JWT_ACCESS_TTL: z.coerce.number().int().positive().default(900),

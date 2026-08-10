@@ -131,3 +131,15 @@ export interface ApiErrorBody {
   timestamp: string;
   requestId: string;
 }
+
+/**
+ * Optimistic-concurrency guard sent with any edit to a versioned document.
+ *
+ * The client echoes the `version` it last read; the server rejects the write
+ * with 409 if the row has moved on. Without it, two managers editing the same
+ * purchase order silently overwrite each other and the loser never finds out.
+ */
+export const versionedSchema = z.object({
+  expectedVersion: z.coerce.number().int().positive().optional(),
+});
+export type Versioned = z.infer<typeof versionedSchema>;

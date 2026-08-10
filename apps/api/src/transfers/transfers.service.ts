@@ -200,7 +200,7 @@ export class TransfersService {
 
       return tx.stockTransfer.update({
         where: { id },
-        data: { status: 'IN_TRANSIT' },
+        data: { status: 'IN_TRANSIT', version: { increment: 1 } },
         include: TRANSFER_INCLUDE,
       });
     });
@@ -248,7 +248,7 @@ export class TransfersService {
 
       return tx.stockTransfer.update({
         where: { id },
-        data: { status: 'COMPLETED', completedAt: new Date() },
+        data: { status: 'COMPLETED', completedAt: new Date(), version: { increment: 1 } },
         include: TRANSFER_INCLUDE,
       });
     });
@@ -301,7 +301,7 @@ export class TransfersService {
 
       return tx.stockTransfer.update({
         where: { id },
-        data: { status: 'CANCELLED' },
+        data: { status: 'CANCELLED', version: { increment: 1 } },
         include: TRANSFER_INCLUDE,
       });
     });
@@ -388,6 +388,7 @@ export class TransfersService {
     return {
       id: transfer.id,
       code: transfer.code,
+      version: transfer.version,
       status: transfer.status as StockTransferStatus,
       notes: transfer.notes,
       sourceWarehouse: transfer.sourceWarehouse,

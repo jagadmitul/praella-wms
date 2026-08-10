@@ -100,6 +100,8 @@ model User {
 
   memberships     Membership[]
   refreshTokens   RefreshToken[]
+  passwordResets  PasswordResetToken[]
+  invitationsSent Invitation[]         @relation("InvitationsSent")
   stockMovements  StockMovement[]
   stockTransfers  StockTransfer[]
   purchaseOrders  PurchaseOrder[]
@@ -130,6 +132,7 @@ model Organization {
   bulkJobs       BulkJob[]
   auditLogs      AuditLog[]
   counters       DocumentCounter[]
+  invitations    Invitation[]
 
   @@map("organizations")
 }
@@ -187,6 +190,51 @@ model RefreshToken {
 
   @@index([userId, expiresAt])
   @@map("refresh_tokens")
+}
+
+/// A pending invitation to join an organisation.
+///
+/// Only a hash of the token is stored, exactly as for refresh tokens: the raw
+/// value exists once, in the link that is emailed, and never at rest. The role
+/// and warehouse assignments are decided at invite time so accepting the invite
+/// cannot escalate the invitee's own privileges.
+model Invitation {
+  id             String    @id @default(cuid(2))
+  organizationId String
+  email          String
+  fullName       String
+  role           Role      @default(STAFF)
+  /// Warehouses a STAFF invitee will be scoped to once they accept.
+  warehouseIds   String[]  @default([])
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  invitedById    String?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User?        @relation("InvitationsSent", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, email])
+  @@index([expiresAt])
+  @@map("invitations")
+}
+
+/// A single-use, expiring password-reset token. Hashed at rest for the same
+/// reason as every other token here.
+model PasswordResetToken {
+  id        String    @id @default(cuid(2))
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("password_reset_tokens")
 }
 
 /* -------------------------------------------------------------------------- */
@@ -324,6 +372,10 @@ model StockLevel {
   @@unique([productId, warehouseId])
   @@index([organizationId, warehouseId])
   @@index([organizationId, productId])
+  /// Supports the replenishment query. `reorderPoint > 0` ("is this line
+  /// tracked at all?") is the selective part and narrows the scan before
+  /// Postgres evaluates `quantity <= reorderPoint`.
+  @@index([organizationId, reorderPoint])
   @@map("stock_levels")
 }
 
@@ -378,6 +430,8 @@ model StockTransfer {
   destinationWarehouseId String
   notes                  String?
   createdById            String?
+  /// Incremented on every mutation. See PurchaseOrder.version.
+  version                Int                 @default(1)
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
   completedAt            DateTime?
@@ -423,6 +477,9 @@ model PurchaseOrder {
   totalAmount    Decimal             @default(0) @db.Decimal(14, 2)
   createdById    String?
   createdAt      DateTime            @default(now())
+  /// Incremented on every mutation. Callers pass the version they read;
+  /// a mismatch means someone else edited first and the write is rejected.
+  version        Int                 @default(1)
   updatedAt      DateTime            @updatedAt
 
   organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -465,6 +522,9 @@ model SalesOrder {
   fulfilledAt    DateTime?
   createdById    String?
   createdAt      DateTime         @default(now())
+  /// Incremented on every mutation. Callers pass the version they read;
+  /// a mismatch means someone else edited first and the write is rejected.
+  version        Int              @default(1)
   updatedAt      DateTime         @updatedAt
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)

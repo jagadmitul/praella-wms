@@ -24,6 +24,15 @@ import type {
 import { AuthService } from './auth.service';
 import { TokenService, type TokenClientInfo } from './token.service';
 import { RefreshTokenDto, SignInDto, SignUpDto } from './dto/auth.dto';
+import { createZodDto } from 'nestjs-zod';
+import {
+  confirmPasswordResetSchema,
+  requestPasswordResetSchema,
+} from '@wms/contracts';
+import { PasswordResetService } from './password-reset.service';
+
+class RequestPasswordResetDto extends createZodDto(requestPasswordResetSchema) {}
+class ConfirmPasswordResetDto extends createZodDto(confirmPasswordResetSchema) {}
 
 /**
  * Sign-up and sign-in are far tighter than the global limit — they are the
@@ -44,6 +53,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly tokenService: TokenService,
+    private readonly passwordResetService: PasswordResetService,
   ) {}
 
   @Public()
@@ -101,6 +111,33 @@ export class AuthController {
   @ApiBody({ type: RefreshTokenDto })
   async signOut(@Body() body: RefreshTokenDto): Promise<void> {
     await this.tokenService.revoke(body.refreshToken);
+  }
+
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('password-reset/request')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Request a password-reset link',
+    description:
+      'Always returns 204, whether or not the address exists — an endpoint that 404s on unknown emails is a free account-enumeration oracle.',
+  })
+  @ApiBody({ type: RequestPasswordResetDto })
+  async requestPasswordReset(@Body() body: RequestPasswordResetDto): Promise<void> {
+    await this.passwordResetService.request(body.email);
+  }
+
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('password-reset/confirm')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Set a new password using a reset token',
+    description: 'Consumes the token and revokes every active session for that user.',
+  })
+  @ApiBody({ type: ConfirmPasswordResetDto })
+  async confirmPasswordReset(@Body() body: ConfirmPasswordResetDto): Promise<void> {
+    await this.passwordResetService.confirm(body.token, body.password);
   }
 
   @SkipOrgContext()

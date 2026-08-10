@@ -110,3 +110,45 @@ export interface RefreshTokenPayload {
   tokenType: 'refresh';
   jti: string;
 }
+
+/* -------------------------------------------------------------------------- */
+/*                             Password reset flow                            */
+/* -------------------------------------------------------------------------- */
+
+export const requestPasswordResetSchema = z.object({
+  email: emailSchema,
+});
+export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchema>;
+
+export const confirmPasswordResetSchema = z.object({
+  token: z.string().min(1, 'Reset token is required'),
+  password: passwordSchema,
+});
+export type ConfirmPasswordResetInput = z.infer<typeof confirmPasswordResetSchema>;
+
+/* -------------------------------------------------------------------------- */
+/*                                 Invitations                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Accepting an invitation only sets a password. Role and warehouse scope were
+ * fixed by the inviting admin and are read from the stored invitation, so an
+ * invitee cannot promote themselves on the way in.
+ */
+export const acceptInvitationSchema = z.object({
+  token: z.string().min(1, 'Invitation token is required'),
+  password: passwordSchema,
+});
+export type AcceptInvitationInput = z.infer<typeof acceptInvitationSchema>;
+
+/** Public preview of an invitation, shown before the invitee sets a password. */
+export const invitationPreviewSchema = z.object({
+  email: z.string(),
+  fullName: z.string(),
+  organizationName: z.string(),
+  role: roleSchema,
+  expiresAt: z.string(),
+  /** True when the invitee already has an account and only needs to accept. */
+  hasExistingAccount: z.boolean(),
+});
+export type InvitationPreview = z.infer<typeof invitationPreviewSchema>;

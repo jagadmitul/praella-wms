@@ -18,6 +18,7 @@ import { CacheService } from '../cache/cache.service';
 import { AuditService } from '../common/services/audit.service';
 import { DocumentCounterService } from '../common/services/document-counter.service';
 import { paginate, toPrismaPage } from '../common/utils/pagination.util';
+import { assertVersion } from '../common/utils/concurrency.util';
 import { multiplyMoney, sumMoney, toMoneyString } from '../common/utils/decimal.util';
 import {
   assertWarehouseAccess,
@@ -199,12 +200,14 @@ export class SalesOrdersService {
       'DRAFT',
       'ALLOCATED',
     ]);
+    assertVersion('sales order', order.version, input.expectedVersion);
 
     const updated = await this.prisma.salesOrder.update({
       where: { id },
       data: {
         ...(input.customerName === undefined ? {} : { customerName: input.customerName }),
         ...(input.notes === undefined ? {} : { notes: input.notes }),
+        version: { increment: 1 },
       },
       include: SO_INCLUDE,
     });
@@ -246,7 +249,7 @@ export class SalesOrdersService {
 
       return tx.salesOrder.update({
         where: { id },
-        data: { status: 'ALLOCATED' },
+        data: { status: 'ALLOCATED', version: { increment: 1 } },
         include: SO_INCLUDE,
       });
     });
@@ -328,6 +331,7 @@ export class SalesOrdersService {
         data: {
           status: fullyFulfilled ? 'FULFILLED' : 'PARTIALLY_FULFILLED',
           fulfilledAt: fullyFulfilled ? new Date() : null,
+          version: { increment: 1 },
         },
         include: SO_INCLUDE,
       });
@@ -382,7 +386,7 @@ export class SalesOrdersService {
 
       return tx.salesOrder.update({
         where: { id },
-        data: { status: 'CANCELLED' },
+        data: { status: 'CANCELLED', version: { increment: 1 } },
         include: SO_INCLUDE,
       });
     });
@@ -507,6 +511,7 @@ export class SalesOrdersService {
     return {
       id: order.id,
       code: order.code,
+      version: order.version,
       status: order.status as SalesOrderStatus,
       notes: order.notes,
       totalAmount: toMoneyString(order.totalAmount),

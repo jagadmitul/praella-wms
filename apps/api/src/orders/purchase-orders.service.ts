@@ -18,6 +18,7 @@ import { CacheService } from '../cache/cache.service';
 import { AuditService } from '../common/services/audit.service';
 import { DocumentCounterService } from '../common/services/document-counter.service';
 import { paginate, toPrismaPage } from '../common/utils/pagination.util';
+import { assertVersion } from '../common/utils/concurrency.util';
 import { multiplyMoney, sumMoney, toMoneyString } from '../common/utils/decimal.util';
 import {
   assertWarehouseAccess,
@@ -197,6 +198,7 @@ export class PurchaseOrdersService {
       'DRAFT',
       'SUBMITTED',
     ]);
+    assertVersion('purchase order', order.version, input.expectedVersion);
 
     const updated = await this.prisma.purchaseOrder.update({
       where: { id },
@@ -205,6 +207,7 @@ export class PurchaseOrdersService {
           ? {}
           : { expectedAt: new Date(input.expectedAt) }),
         ...(input.notes === undefined ? {} : { notes: input.notes }),
+        version: { increment: 1 },
       },
       include: PO_INCLUDE,
     });
@@ -234,7 +237,7 @@ export class PurchaseOrdersService {
 
     const updated = await this.prisma.purchaseOrder.update({
       where: { id },
-      data: { status: 'SUBMITTED' },
+      data: { status: 'SUBMITTED', version: { increment: 1 } },
       include: PO_INCLUDE,
     });
 
@@ -313,6 +316,7 @@ export class PurchaseOrdersService {
         data: {
           status: fullyReceived ? 'RECEIVED' : 'PARTIALLY_RECEIVED',
           receivedAt: fullyReceived ? new Date() : null,
+          version: { increment: 1 },
         },
         include: PO_INCLUDE,
       });
@@ -355,7 +359,7 @@ export class PurchaseOrdersService {
 
     const updated = await this.prisma.purchaseOrder.update({
       where: { id },
-      data: { status: 'CANCELLED' },
+      data: { status: 'CANCELLED', version: { increment: 1 } },
       include: PO_INCLUDE,
     });
 
@@ -492,6 +496,7 @@ export class PurchaseOrdersService {
     return {
       id: order.id,
       code: order.code,
+      version: order.version,
       status: order.status as PurchaseOrderStatus,
       notes: order.notes,
       totalAmount: toMoneyString(order.totalAmount),

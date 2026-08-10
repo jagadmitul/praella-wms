@@ -147,6 +147,8 @@ export interface StockMovementView {
 export interface StockTransferView {
   id: string;
   code: string;
+  /** Optimistic-concurrency token; echo it back when editing. */
+  version: number;
   status: StockTransferStatus;
   notes: string | null;
   sourceWarehouse: { id: string; name: string; code: string };
@@ -164,6 +166,8 @@ export interface StockTransferView {
 export interface PurchaseOrderView {
   id: string;
   code: string;
+  /** Optimistic-concurrency token; echo it back when editing. */
+  version: number;
   status: PurchaseOrderStatus;
   notes: string | null;
   totalAmount: string;
@@ -187,6 +191,8 @@ export interface PurchaseOrderView {
 export interface SalesOrderView {
   id: string;
   code: string;
+  /** Optimistic-concurrency token; echo it back when editing. */
+  version: number;
   status: SalesOrderStatus;
   notes: string | null;
   totalAmount: string;
@@ -249,4 +255,22 @@ export interface DashboardSummaryView {
   topLowStock: LowStockItemView[];
   /** Units in and out per day for the last 14 days, oldest first. */
   movementTrend: Array<{ date: string; inbound: number; outbound: number }>;
+}
+
+export interface InvitationView {
+  id: string;
+  email: string;
+  fullName: string;
+  role: Role;
+  status: 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED';
+  expiresAt: string;
+  acceptedAt: string | null;
+  createdAt: string;
+  invitedBy: { id: string; fullName: string } | null;
+  warehouses: Array<{ id: string; name: string; code: string }>;
+  /**
+   * The acceptance link. Returned only at creation time, because the raw token
+   * is never stored — only its hash.
+   */
+  inviteUrl?: string;
 }

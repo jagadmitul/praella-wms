@@ -5,11 +5,12 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { TokenService } from './token.service';
+import { PasswordResetService } from './password-reset.service';
 
 @Module({
   imports: [PassportModule.register({ defaultStrategy: 'jwt' }), JwtModule.register({})],
   controllers: [AuthController],
-  providers: [AuthService, TokenService, JwtStrategy],
-  exports: [AuthService, TokenService],
+  providers: [AuthService, TokenService, JwtStrategy, PasswordResetService],
+  exports: [AuthService, TokenService, PasswordResetService],
 })
 export class AuthModule {}

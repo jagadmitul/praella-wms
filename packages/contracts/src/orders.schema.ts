@@ -37,6 +37,8 @@ export type CreatePurchaseOrderInput = z.infer<typeof createPurchaseOrderSchema>
 export const updatePurchaseOrderSchema = z.object({
   expectedAt: z.string().datetime({ offset: true }).optional(),
   notes: noteSchema,
+  /** Version the client last read; a mismatch is rejected with 409. */
+  expectedVersion: z.coerce.number().int().positive().optional(),
 });
 export type UpdatePurchaseOrderInput = z.infer<typeof updatePurchaseOrderSchema>;
 
@@ -102,6 +104,8 @@ export type CreateSalesOrderInput = z.infer<typeof createSalesOrderSchema>;
 export const updateSalesOrderSchema = z.object({
   customerName: shortTextSchema.optional(),
   notes: noteSchema,
+  /** Version the client last read; a mismatch is rejected with 409. */
+  expectedVersion: z.coerce.number().int().positive().optional(),
 });
 export type UpdateSalesOrderInput = z.infer<typeof updateSalesOrderSchema>;
 

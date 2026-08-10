@@ -30,6 +30,30 @@ import {
 
 const LEVEL_SORTABLE_FIELDS = ['quantity', 'updatedAt', 'reorderPoint'] as const;
 
+/**
+ * Filter matching stock levels at or below their replenishment threshold.
+ *
+ * `quantity <= reorderPoint` compares two columns, which Prisma expresses with
+ * a field reference — so the whole predicate runs in Postgres and the endpoint
+ * paginates correctly. Doing the comparison in JavaScript, as an earlier
+ * version did, silently broke `totalItems` because rows were dropped *after*
+ * the page had already been taken.
+ *
+ * `reorderPoint > 0` is kept as a separate, indexable predicate: a threshold of
+ * zero means "not tracked", not "always low".
+ *
+ * @param prisma - Client instance, needed to reach `fields` for the reference.
+ * @returns A Prisma `where` fragment to spread into a stock-level query.
+ */
+export function belowThresholdFilter(
+  prisma: PrismaService,
+): Prisma.StockLevelWhereInput {
+  return {
+    reorderPoint: { gt: 0 },
+    quantity: { lte: prisma.stockLevel.fields.reorderPoint },
+  };
+}
+
 @Injectable()
 export class StockService {
   constructor(
@@ -311,7 +335,7 @@ export class StockService {
       const rows = await this.prisma.stockLevel.findMany({
         where: {
           organizationId: orgContext.organizationId,
-          reorderPoint: { gt: 0 },
+          ...belowThresholdFilter(this.prisma),
           ...(warehouseId ? { warehouseId } : scope ? { warehouseId: scope } : {}),
           product: { isActive: true },
         },
@@ -329,10 +353,6 @@ export class StockService {
       });
 
       return rows
-        // Prisma cannot compare two columns in a `where`, so the threshold test
-        // happens here. The query above is already narrowed to rows that have a
-        // threshold set at all, which keeps the scanned set small.
-        .filter((level) => level.quantity <= level.reorderPoint)
         .map((level) => ({
           productId: level.product.id,
           productName: level.product.name,
@@ -373,7 +393,7 @@ export class StockService {
           ? { warehouseId: scope }
           : {}),
       ...(query.categoryId ? { product: { categoryId: query.categoryId } } : {}),
-      ...(query.belowThreshold ? { reorderPoint: { gt: 0 } } : {}),
+      ...(query.belowThreshold ? belowThresholdFilter(this.prisma) : {}),
       ...(query.search
         ? {
             product: {

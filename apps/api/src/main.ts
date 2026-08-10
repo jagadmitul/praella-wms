@@ -5,8 +5,11 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import compression from 'compression';
+import express from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { JsonLogger } from './observability/json-logger';
+import { currentRequestId } from './observability/request-context';
 
 /**
  * Boots the HTTP server.
@@ -16,12 +19,22 @@ import { AppModule } from './app.module';
  * call is far more expensive than carrying the prefix from the start.
  */
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: false });
+  // Log lines carry the request's correlation id without any call site
+  // needing to pass it.
+  JsonLogger.bindRequestContext(currentRequestId);
+
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: false,
+    logger: new JsonLogger(),
+  });
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
   app.use(helmet());
   app.use(compression());
+  // CSV imports arrive as a raw body rather than multipart: it keeps the API
+  // curl-friendly and avoids a file-upload dependency for a text format.
+  app.use(express.text({ type: 'text/csv', limit: '20mb' }));
 
   app.enableCors({
     origin: configService.getOrThrow<string[]>('CORS_ORIGINS'),
@@ -30,7 +43,7 @@ async function bootstrap(): Promise<void> {
     exposedHeaders: ['x-request-id'],
   });
 
-  app.setGlobalPrefix('api', { exclude: ['health', 'health/ready'] });
+  app.setGlobalPrefix('api', { exclude: ['health', 'health/ready', 'metrics'] });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
   app.enableShutdownHooks();
 
@@ -71,6 +84,7 @@ async function bootstrap(): Promise<void> {
   await app.listen(port, '0.0.0.0');
 
   logger.log(`API listening on http://localhost:${port}/api/v1`);
+  logger.log(`Prometheus metrics at http://localhost:${port}/metrics`);
   logger.log(`Swagger UI available at http://localhost:${port}/docs`);
 }
 

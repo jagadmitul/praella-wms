@@ -55,7 +55,7 @@ export async function createTestApp(
   const moduleRef = await builder.compile();
 
   const app = moduleRef.createNestApplication();
-  app.setGlobalPrefix('api', { exclude: ['health', 'health/ready'] });
+  app.setGlobalPrefix('api', { exclude: ['health', 'health/ready', 'metrics'] });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
   await app.init();
