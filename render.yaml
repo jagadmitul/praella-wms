@@ -1,0 +1,64 @@
+# Render Blueprint — one-click infrastructure for the API.
+#
+# The dashboard is deployed separately to Vercel, which is a better fit for a
+# Next.js app than a container. The database is an external managed Postgres
+# (Neon) rather than a Render instance, so the demo survives Render's 30-day
+# free-database expiry — a reviewer may open the link weeks after submission.
+#
+# Usage: Render dashboard → New → Blueprint → point at this repository.
+# Then set DATABASE_URL in the service's environment.
+
+services:
+  - type: web
+    name: wms-api
+    runtime: docker
+    repo: https://github.com/jagadmitul/praella-wms
+    branch: main
+    region: singapore
+    plan: free
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4300
+      # Managed Postgres lives outside Render; set this in the dashboard.
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_ENABLED
+        value: true
+      - key: REDIS_HOST
+        fromService:
+          name: wms-redis
+          type: keyvalue
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: wms-redis
+          type: keyvalue
+          property: port
+      # Generated once by Render and kept stable across deploys, so existing
+      # sessions are not invalidated every time the service restarts.
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: QUEUE_PREFIX
+        value: wms-prod
+      - key: LOG_FORMAT
+        value: json
+      # Both point at the deployed dashboard; set once its URL is known.
+      - key: APP_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+
+  - type: keyvalue
+    name: wms-redis
+    region: singapore
+    plan: free
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
