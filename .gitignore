@@ -1,0 +1,27 @@
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+.turbo/
+
+.env
+.env.*
+!.env.example
+
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+*.tsbuildinfo
+next-env.d.ts
+
+# Prisma 7 generates the client into the source tree; it is rebuilt by
+# `prisma generate`, which runs automatically on install.
+apps/api/src/generated/

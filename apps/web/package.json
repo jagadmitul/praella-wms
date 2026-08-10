@@ -1,0 +1,30 @@
+{
+  "name": "@wms/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3300",
+    "build": "next build",
+    "start": "next start --port 3300",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"UI is covered by the API integration suite and manual QA\" && exit 0"
+  },
+  "dependencies": {
+    "@wms/contracts": "workspace:*",
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

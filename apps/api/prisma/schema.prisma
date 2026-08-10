@@ -1,0 +1,553 @@
+// Warehouse & Inventory Management System — data model
+//
+// Design notes
+// ------------
+// * Every tenant-owned row carries `organizationId`. All queries are filtered by
+//   it, which makes cross-tenant leakage a query-level impossibility rather than
+//   something each endpoint has to remember.
+// * Stock is never stored as a single number on the product. `StockLevel` holds
+//   the on-hand quantity per (product, warehouse) pair, and `StockMovement` is
+//   an append-only ledger explaining how each level got where it is.
+// * Warehouse references on the ledger are `SetNull`, so deleting a warehouse
+//   never destroys the history of what moved through it.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  runtime      = "nodejs"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                    Enums                                   */
+/* -------------------------------------------------------------------------- */
+
+enum Role {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum MovementType {
+  INBOUND
+  OUTBOUND
+  TRANSFER_OUT
+  TRANSFER_IN
+  ADJUSTMENT
+}
+
+enum MovementReferenceType {
+  PURCHASE_ORDER
+  SALES_ORDER
+  STOCK_TRANSFER
+  MANUAL_ADJUSTMENT
+  BULK_JOB
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SUBMITTED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum SalesOrderStatus {
+  DRAFT
+  ALLOCATED
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+}
+
+enum StockTransferStatus {
+  DRAFT
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
+
+enum BulkJobType {
+  BULK_STOCK_ADJUSTMENT
+  BULK_PRODUCT_IMPORT
+}
+
+enum BulkJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+}
+
+/* -------------------------------------------------------------------------- */
+/*                             Identity & tenancy                             */
+/* -------------------------------------------------------------------------- */
+
+model User {
+  id           String    @id @default(cuid(2))
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  memberships     Membership[]
+  refreshTokens   RefreshToken[]
+  stockMovements  StockMovement[]
+  stockTransfers  StockTransfer[]
+  purchaseOrders  PurchaseOrder[]
+  salesOrders     SalesOrder[]
+  bulkJobs        BulkJob[]
+  auditLogs       AuditLog[]
+
+  @@map("users")
+}
+
+model Organization {
+  id        String   @id @default(cuid(2))
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships    Membership[]
+  warehouses     Warehouse[]
+  categories     Category[]
+  suppliers      Supplier[]
+  products       Product[]
+  stockLevels    StockLevel[]
+  stockMovements StockMovement[]
+  stockTransfers StockTransfer[]
+  purchaseOrders PurchaseOrder[]
+  salesOrders    SalesOrder[]
+  bulkJobs       BulkJob[]
+  auditLogs      AuditLog[]
+  counters       DocumentCounter[]
+
+  @@map("organizations")
+}
+
+/// Links a user to an organisation with a role. A user may belong to several
+/// organisations, each with a different role.
+model Membership {
+  id             String   @id @default(cuid(2))
+  userId         String
+  organizationId String
+  role           Role     @default(STAFF)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  warehouses   WarehouseMember[]
+
+  @@unique([userId, organizationId])
+  @@index([organizationId, role])
+  @@map("memberships")
+}
+
+/// Restricts a STAFF membership to specific warehouses. ADMIN and MANAGER
+/// memberships see every warehouse in the organisation and have no rows here.
+model WarehouseMember {
+  id           String   @id @default(cuid(2))
+  membershipId String
+  warehouseId  String
+  createdAt    DateTime @default(now())
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  warehouse  Warehouse  @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, warehouseId])
+  @@index([warehouseId])
+  @@map("warehouse_members")
+}
+
+/// Hashed, rotating refresh tokens. Storing a hash means a database leak cannot
+/// be replayed against the API, and `replacedById` gives us a reuse-detection
+/// chain if a stolen token is ever presented twice.
+model RefreshToken {
+  id           String    @id @default(cuid(2))
+  userId       String
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?
+  userAgent    String?
+  ipAddress    String?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("refresh_tokens")
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                  Warehouse                                 */
+/* -------------------------------------------------------------------------- */
+
+model Warehouse {
+  id             String   @id @default(cuid(2))
+  organizationId String
+  name           String
+  code           String
+  addressLine1   String?
+  addressLine2   String?
+  city           String?
+  state          String?
+  country        String?
+  postalCode     String?
+  notes          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization         Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members              WarehouseMember[]
+  stockLevels          StockLevel[]
+  movements            StockMovement[]   @relation("MovementWarehouse")
+  counterpartMovements StockMovement[]   @relation("MovementCounterpartWarehouse")
+  transfersOut         StockTransfer[]   @relation("TransferSourceWarehouse")
+  transfersIn          StockTransfer[]   @relation("TransferDestinationWarehouse")
+  purchaseOrders       PurchaseOrder[]
+  salesOrders          SalesOrder[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, isActive])
+  @@map("warehouses")
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                  Catalogue                                 */
+/* -------------------------------------------------------------------------- */
+
+model Category {
+  id             String   @id @default(cuid(2))
+  organizationId String
+  name           String
+  slug           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  products     Product[]
+
+  @@unique([organizationId, slug])
+  @@map("categories")
+}
+
+model Supplier {
+  id             String   @id @default(cuid(2))
+  organizationId String
+  name           String
+  contactName    String?
+  email          String?
+  phone          String?
+  address        String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  products       Product[]
+  purchaseOrders PurchaseOrder[]
+
+  @@unique([organizationId, name])
+  @@map("suppliers")
+}
+
+model Product {
+  id                     String   @id @default(cuid(2))
+  organizationId         String
+  name                   String
+  sku                    String
+  description            String?
+  categoryId             String?
+  supplierId             String?
+  unitPrice              Decimal  @db.Decimal(12, 2)
+  unit                   String   @default("pcs")
+  /// Copied onto new stock levels so a product carries a sensible default
+  /// threshold into every warehouse it lands in.
+  defaultReorderPoint    Int      @default(0)
+  defaultReorderQuantity Int      @default(0)
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category           Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  supplier           Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  stockLevels        StockLevel[]
+  movements          StockMovement[]
+  transferItems      StockTransferItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  salesOrderItems    SalesOrderItem[]
+
+  @@unique([organizationId, sku])
+  @@index([organizationId, name])
+  @@index([organizationId, categoryId])
+  @@index([organizationId, isActive])
+  @@map("products")
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              Stock & movement                              */
+/* -------------------------------------------------------------------------- */
+
+/// On-hand stock for one product in one warehouse, plus that pair's
+/// replenishment rule. `reservedQuantity` is held by allocated sales orders;
+/// available stock is `quantity - reservedQuantity`.
+model StockLevel {
+  id               String   @id @default(cuid(2))
+  organizationId   String
+  productId        String
+  warehouseId      String
+  quantity         Int      @default(0)
+  reservedQuantity Int      @default(0)
+  reorderPoint     Int      @default(0)
+  reorderQuantity  Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, warehouseId])
+  @@index([organizationId, warehouseId])
+  @@index([organizationId, productId])
+  @@map("stock_levels")
+}
+
+/// Append-only ledger. Rows are never updated or deleted, so the signed sum of
+/// a product's movements in a warehouse always reconciles to its stock level.
+///
+/// `warehouseId` is deliberately a single required column naming the warehouse
+/// whose balance this row changed. An earlier source/destination pair made
+/// "which site did this actually affect?" ambiguous for transfers, where both
+/// ends are populated. `counterpartWarehouseId` carries the other end of a
+/// transfer so the UI can still render "Surat → Bengaluru".
+model StockMovement {
+  id                     String                @id @default(cuid(2))
+  organizationId         String
+  productId              String
+  type                   MovementType
+  /// Always positive. `type` carries the direction.
+  quantity               Int
+  /// On-hand quantity in the affected warehouse immediately after this row was
+  /// written. Denormalised so history screens need no running-total window.
+  balanceAfter           Int
+  unitCost               Decimal?              @db.Decimal(12, 2)
+  note                   String?
+  referenceType          MovementReferenceType
+  referenceId            String?
+  referenceCode          String?
+  warehouseId            String
+  counterpartWarehouseId String?
+  createdById            String?
+  createdAt              DateTime              @default(now())
+
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product              Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  warehouse            Warehouse    @relation("MovementWarehouse", fields: [warehouseId], references: [id], onDelete: Restrict)
+  counterpartWarehouse Warehouse?   @relation("MovementCounterpartWarehouse", fields: [counterpartWarehouseId], references: [id], onDelete: SetNull)
+  createdBy            User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, productId, createdAt])
+  @@index([organizationId, warehouseId, createdAt])
+  @@index([organizationId, type])
+  @@index([counterpartWarehouseId])
+  @@map("stock_movements")
+}
+
+model StockTransfer {
+  id                     String              @id @default(cuid(2))
+  organizationId         String
+  code                   String
+  status                 StockTransferStatus @default(DRAFT)
+  sourceWarehouseId      String
+  destinationWarehouseId String
+  notes                  String?
+  createdById            String?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  completedAt            DateTime?
+
+  organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceWarehouse      Warehouse           @relation("TransferSourceWarehouse", fields: [sourceWarehouseId], references: [id], onDelete: Restrict)
+  destinationWarehouse Warehouse           @relation("TransferDestinationWarehouse", fields: [destinationWarehouseId], references: [id], onDelete: Restrict)
+  createdBy            User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  items                StockTransferItem[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+  @@map("stock_transfers")
+}
+
+model StockTransferItem {
+  id         String @id @default(cuid(2))
+  transferId String
+  productId  String
+  quantity   Int
+
+  transfer StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product  Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([transferId, productId])
+  @@map("stock_transfer_items")
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                   Orders                                   */
+/* -------------------------------------------------------------------------- */
+
+model PurchaseOrder {
+  id             String              @id @default(cuid(2))
+  organizationId String
+  code           String
+  status         PurchaseOrderStatus @default(DRAFT)
+  supplierId     String
+  warehouseId    String
+  expectedAt     DateTime?
+  receivedAt     DateTime?
+  notes          String?
+  totalAmount    Decimal             @default(0) @db.Decimal(14, 2)
+  createdById    String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplier     Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  warehouse    Warehouse           @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  createdBy    User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  items        PurchaseOrderItem[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+  @@index([organizationId, warehouseId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               String  @id @default(cuid(2))
+  purchaseOrderId  String
+  productId        String
+  quantity         Int
+  receivedQuantity Int     @default(0)
+  unitCost         Decimal @db.Decimal(12, 2)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([purchaseOrderId, productId])
+  @@map("purchase_order_items")
+}
+
+model SalesOrder {
+  id             String           @id @default(cuid(2))
+  organizationId String
+  code           String
+  status         SalesOrderStatus @default(DRAFT)
+  warehouseId    String
+  customerName   String
+  customerEmail  String?
+  notes          String?
+  totalAmount    Decimal          @default(0) @db.Decimal(14, 2)
+  fulfilledAt    DateTime?
+  createdById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  warehouse    Warehouse        @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  createdBy    User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  items        SalesOrderItem[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+  @@index([organizationId, warehouseId])
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id                String  @id @default(cuid(2))
+  salesOrderId      String
+  productId         String
+  quantity          Int
+  fulfilledQuantity Int     @default(0)
+  unitPrice         Decimal @db.Decimal(12, 2)
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([salesOrderId, productId])
+  @@map("sales_order_items")
+}
+
+/* -------------------------------------------------------------------------- */
+/*                            Platform / operations                           */
+/* -------------------------------------------------------------------------- */
+
+/// Per-organisation sequence used to mint human-readable document numbers such
+/// as `PO-000042`. Incremented inside the same transaction that creates the
+/// document, so two concurrent requests can never mint the same code.
+model DocumentCounter {
+  id             String   @id @default(cuid(2))
+  organizationId String
+  scope          String
+  value          Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, scope])
+  @@map("document_counters")
+}
+
+model BulkJob {
+  id             String        @id @default(cuid(2))
+  organizationId String
+  type           BulkJobType
+  status         BulkJobStatus @default(QUEUED)
+  totalLines     Int           @default(0)
+  processedLines Int           @default(0)
+  failedLines    Int           @default(0)
+  errors         Json          @default("[]")
+  createdById    String?
+  createdAt      DateTime      @default(now())
+  startedAt      DateTime?
+  finishedAt     DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@map("bulk_jobs")
+}
+
+model AuditLog {
+  id             String   @id @default(cuid(2))
+  organizationId String
+  actorId        String?
+  action         String
+  entityType     String
+  entityId       String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, entityType, entityId])
+  @@map("audit_logs")
+}

@@ -1,0 +1,121 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens.
+ *
+ * The palette is deliberately restrained: an operations console is read for
+ * hours at a time, so colour is reserved for meaning (stock below threshold,
+ * an order still open) rather than decoration. Numbers use tabular figures so
+ * quantity columns line up down the page.
+ */
+@theme {
+  --color-paper: #f6f5f2;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #faf9f7;
+
+  --color-ink-900: #10151c;
+  --color-ink-800: #1a212b;
+  --color-ink-700: #2b3542;
+  --color-ink-500: #5b6675;
+  --color-ink-400: #7d8798;
+  --color-ink-300: #a8b1be;
+
+  --color-line: #e4e1db;
+  --color-line-strong: #d2cec6;
+
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dbe6fe;
+  --color-brand-500: #3b6df5;
+  --color-brand-600: #2a55d4;
+  --color-brand-700: #1f42ab;
+
+  --color-positive-50: #ecfdf5;
+  --color-positive-600: #05966a;
+  --color-positive-700: #047956;
+
+  --color-warning-50: #fff8eb;
+  --color-warning-600: #c07807;
+  --color-warning-700: #9a5f05;
+
+  --color-danger-50: #fef2f2;
+  --color-danger-600: #d64545;
+  --color-danger-700: #b02f2f;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --radius-card: 0.75rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink-800);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv02', 'cv03', 'cv04';
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Quantities, money and codes must align in columns. */
+  .tabular,
+  td.tabular,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background-color: var(--color-brand-100);
+  }
+}
+
+@layer components {
+  .card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+  }
+
+  .field {
+    width: 100%;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 0.5rem;
+    background-color: var(--color-surface);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-ink-800);
+    outline: none;
+    transition:
+      border-color 120ms ease,
+      box-shadow 120ms ease;
+  }
+
+  .field:focus {
+    border-color: var(--color-brand-500);
+    box-shadow: 0 0 0 3px var(--color-brand-100);
+  }
+
+  .field::placeholder {
+    color: var(--color-ink-300);
+  }
+}
+
+/* Respect a reader who has asked for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

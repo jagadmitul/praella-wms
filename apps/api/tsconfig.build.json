@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Pinned so the build emits dist/main.js rather than dist/src/main.js — the
+    // root tsconfig also covers prisma/ and scripts/, which would otherwise
+    // widen the inferred rootDir to the package root.
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "test",
+    "dist",
+    "scripts",
+    "prisma",
+    "**/*.spec.ts",
+    "**/*.e2e-spec.ts"
+  ]
+}

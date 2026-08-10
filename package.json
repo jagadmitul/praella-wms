@@ -1,0 +1,31 @@
+{
+  "name": "praella-wms",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Warehouse & Inventory Management System — Praella senior backend practical test",
+  "packageManager": "pnpm@10.29.3",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:e2e": "pnpm --filter @wms/api test:e2e",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:reset": "docker compose down -v && docker compose up -d",
+    "db:migrate": "pnpm --filter @wms/api prisma:migrate",
+    "db:deploy": "pnpm --filter @wms/api prisma:deploy",
+    "db:seed": "pnpm --filter @wms/api prisma:seed",
+    "db:studio": "pnpm --filter @wms/api prisma:studio",
+    "db:dump": "pnpm --filter @wms/api db:dump",
+    "bootstrap": "pnpm install && pnpm --filter @wms/contracts build && pnpm infra:up && pnpm db:deploy && pnpm db:seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.8",
+    "typescript": "^5.9.3"
+  }
+}
