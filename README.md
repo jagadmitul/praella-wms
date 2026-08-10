@@ -192,6 +192,7 @@ praella-wms/
 | `TEST_DATABASE_URL` | `…/wms_test` | Created automatically by the e2e suite |
 | `REDIS_ENABLED` | `true` | `false` disables cache + queues entirely |
 | `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6381` | |
+| `QUEUE_PREFIX` | `wms` | Namespaces BullMQ keys; give each environment its own value |
 | `JWT_ACCESS_SECRET` | dev value | **Must be ≥ 32 chars and different from the refresh secret** |
 | `JWT_REFRESH_SECRET` | dev value | |
 | `JWT_ACCESS_TTL` | `900` | Seconds |
@@ -552,6 +553,8 @@ Prisma 7's move to driver adapters is a genuine improvement — the connection p
 **Health probes and API versioning.** `/health` was answering on `/v1/health`, because URI versioning applies to routes even when they are excluded from the global prefix. An integration test caught it. Probes now use `VERSION_NEUTRAL`, so a load balancer does not need reconfiguring the day the API goes to v2.
 
 **A partial `dist` that ran but crashed.** `nest build` deletes the output directory while TypeScript's `incremental` build info still claims those files are current, so the build silently emitted a partial `dist` that failed at runtime with a missing-module error. Turning off `incremental` fixed it; the note is in `tsconfig.json` so nobody turns it back on.
+
+**A "flaky" test that was really cross-environment contamination.** The bulk-job spec failed roughly one run in four. It was not timing: the test suite and a running dev server shared one BullMQ queue in Redis, so whichever worker happened to claim a job might be connected to the *other* one's database, and would fail to find the job row. The fix was to namespace queue keys with a `QUEUE_PREFIX` — which the application wanted anyway — and give the suite its own. Verified by running the suite five times with the dev server deliberately left running.
 
 **Rate limiting versus the test suite.** The auth endpoints carry a deliberately tight limit that a spec making dozens of legitimate sign-ins trips immediately. Overriding the guard does not work, because `APP_GUARD` instantiates it directly rather than resolving the class token. The fix was to make the limit environment-driven — which it should have been anyway — and have the test setup raise it for every spec except the one that exists to prove rate limiting works.
 

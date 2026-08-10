@@ -25,6 +25,12 @@ import { BULK_STOCK_QUEUE } from './jobs.constants';
           password: configService.get<string>('REDIS_PASSWORD') || undefined,
           db: configService.get<number>('REDIS_DB') ?? 0,
         },
+        // Namespaces every queue key in Redis. Without it, a test run and a
+        // running dev server share one queue, and whichever worker happens to
+        // pick up a job may be connected to the *other* one's database — an
+        // intermittent failure that looks like a flaky test but is really
+        // cross-environment contamination.
+        prefix: configService.get<string>('QUEUE_PREFIX') ?? 'wms',
       }),
     }),
     BullModule.registerQueue({ name: BULK_STOCK_QUEUE }),

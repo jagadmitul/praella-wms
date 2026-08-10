@@ -29,6 +29,8 @@ const envSchema = z
     REDIS_PORT: z.coerce.number().int().default(6381),
     REDIS_PASSWORD: z.string().optional(),
     REDIS_DB: z.coerce.number().int().min(0).default(0),
+    /** Namespaces BullMQ keys so separate environments never share a queue. */
+    QUEUE_PREFIX: z.string().min(1).default('wms'),
 
     JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
     JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),

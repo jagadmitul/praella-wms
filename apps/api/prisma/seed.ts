@@ -361,6 +361,26 @@ async function main(): Promise<void> {
       const balance = ledger.balanceOf(key);
       if (balance <= 0) continue;
 
+      // Occasional cycle-count correction, so the demo data exercises every
+      // movement type a reviewer can filter by — not just in/out.
+      if (random() < 0.06) {
+        const shrinkage = Math.max(1, Math.round(balance * 0.02));
+        ledger.apply({
+          key,
+          type: MovementType.ADJUSTMENT,
+          quantity: shrinkage,
+          createdAt: daysAgo(day),
+          createdById: pick([admin.id, manager.id]),
+          referenceType: MovementReferenceType.MANUAL_ADJUSTMENT,
+          note: pick([
+            'Cycle count variance',
+            'Damaged in handling',
+            'Write-off after quality check',
+          ]),
+        });
+        continue;
+      }
+
       const outbound = random() < 0.72;
       if (outbound) {
         const quantity = Math.max(1, Math.min(balance, Math.round(seed.reorderPoint * (0.05 + random() * 0.35))));

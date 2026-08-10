@@ -24,6 +24,11 @@ process.env.DATABASE_URL =
 // off unless the spec name asks for it.
 process.env.REDIS_ENABLED = testPath.includes('bulk-jobs') ? 'true' : 'false';
 
+// Isolate the test queue from any dev server running against the same Redis.
+// Sharing it lets the dev worker consume a test job and look it up in the wrong
+// database, which surfaces as an intermittent failure.
+process.env.QUEUE_PREFIX = 'wms-test';
+
 process.env.THROTTLE_LIMIT = testPath.includes('rate-limit') ? '5' : '100000';
 process.env.AUTH_THROTTLE_LIMIT = testPath.includes('rate-limit') ? '5' : '100000';
 
