@@ -108,6 +108,32 @@
   .field::placeholder {
     color: var(--color-ink-300);
   }
+
+  /*
+   * Native select chevrons differ between browsers and platforms, and on macOS
+   * Chrome the default is a thin double-arrow that sits inconsistently against
+   * a custom control. Suppressing it and drawing one ourselves means every
+   * select on the site looks identical everywhere.
+   */
+  select.field {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%235b6675' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 1rem 1rem;
+    padding-right: 2.1rem;
+  }
+
+  select.field:disabled {
+    color: var(--color-ink-300);
+    background-color: var(--color-surface-sunken);
+  }
+
+  /* Remove the extra arrow IE/Edge legacy adds on top of ours. */
+  select.field::-ms-expand {
+    display: none;
+  }
 }
 
 /* Respect a reader who has asked for less motion. */

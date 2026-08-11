@@ -1,6 +1,23 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Paginated, PurchaseOrderView, SalesOrderView } from '@wms/contracts';
+import {
+  bulkTransitionSchema,
+  type BulkResult,
+  type Paginated,
+  type PurchaseOrderView,
+  type SalesOrderView,
+} from '@wms/contracts';
+import { createZodDto } from 'nestjs-zod';
+import { runBulk } from '../common/services/bulk.util';
 import { CurrentOrg, CurrentUser, RequirePermissions } from '../common/decorators';
 import type { OrgContext, RequestUser } from '../common/types/request-context';
 import { PurchaseOrdersService } from './purchase-orders.service';
@@ -15,6 +32,8 @@ import {
   UpdatePurchaseOrderDto,
   UpdateSalesOrderDto,
 } from './dto/order.dto';
+
+class BulkTransitionDto extends createZodDto(bulkTransitionSchema) {}
 
 @ApiTags('Purchase orders')
 @ApiBearerAuth('access-token')
@@ -94,6 +113,41 @@ export class PurchaseOrdersController {
     @Body() body: ReceivePurchaseOrderDto,
   ): Promise<PurchaseOrderView> {
     return this.purchaseOrdersService.receive(orgContext, user.id, id, body);
+  }
+
+  @Post('bulk')
+  @RequirePermissions('purchase_order:manage')
+  @ApiOperation({
+    summary: 'Run one transition across many purchase orders',
+    description:
+      'Supported transitions: submit, receive, cancel. Orders are processed independently, so one in the wrong state does not abort the others.',
+  })
+  async bulk(
+    @CurrentOrg() orgContext: OrgContext,
+    @CurrentUser() user: RequestUser,
+    @Body() body: BulkTransitionDto,
+  ): Promise<BulkResult> {
+    const allowed = ['submit', 'receive', 'cancel'] as const;
+    if (!allowed.includes(body.transition as (typeof allowed)[number])) {
+      throw new BadRequestException(
+        `Unsupported transition "${body.transition}". Use one of: ${allowed.join(', ')}`,
+      );
+    }
+
+    return runBulk(
+      body.ids.map((id) => ({ id, label: id })),
+      async (item) => {
+        if (body.transition === 'submit') {
+          await this.purchaseOrdersService.submit(orgContext, user.id, item.id);
+        } else if (body.transition === 'receive') {
+          await this.purchaseOrdersService.receive(orgContext, user.id, item.id, {
+            note: undefined,
+          });
+        } else {
+          await this.purchaseOrdersService.cancel(orgContext, user.id, item.id);
+        }
+      },
+    );
   }
 
   @Post(':id/cancel')
@@ -187,6 +241,40 @@ export class SalesOrdersController {
     @Body() body: FulfillSalesOrderDto,
   ): Promise<SalesOrderView> {
     return this.salesOrdersService.fulfill(orgContext, user.id, id, body);
+  }
+
+  @Post('bulk')
+  @RequirePermissions('sales_order:manage')
+  @ApiOperation({
+    summary: 'Run one transition across many sales orders',
+    description: 'Supported transitions: allocate, fulfill, cancel.',
+  })
+  async bulk(
+    @CurrentOrg() orgContext: OrgContext,
+    @CurrentUser() user: RequestUser,
+    @Body() body: BulkTransitionDto,
+  ): Promise<BulkResult> {
+    const allowed = ['allocate', 'fulfill', 'cancel'] as const;
+    if (!allowed.includes(body.transition as (typeof allowed)[number])) {
+      throw new BadRequestException(
+        `Unsupported transition "${body.transition}". Use one of: ${allowed.join(', ')}`,
+      );
+    }
+
+    return runBulk(
+      body.ids.map((id) => ({ id, label: id })),
+      async (item) => {
+        if (body.transition === 'allocate') {
+          await this.salesOrdersService.allocate(orgContext, user.id, item.id);
+        } else if (body.transition === 'fulfill') {
+          await this.salesOrdersService.fulfill(orgContext, user.id, item.id, {
+            note: undefined,
+          });
+        } else {
+          await this.salesOrdersService.cancel(orgContext, user.id, item.id);
+        }
+      },
+    );
   }
 
   @Post(':id/cancel')

@@ -80,14 +80,15 @@ describe('DocumentComposer', () => {
     await user.click(screen.getByRole('button', { name: '+ Add line' }));
     expect(screen.getAllByLabelText('Qty')).toHaveLength(2);
 
-    await user.click(screen.getAllByRole('button', { name: 'Remove line' })[0]!);
+    await user.click(screen.getAllByRole('button', { name: /^Remove line/ })[0]!);
     expect(screen.getAllByLabelText('Qty')).toHaveLength(1);
   });
 
   it('refuses to let the last line be removed', async () => {
     await openComposer();
 
-    expect(screen.getByRole('button', { name: 'Remove line' })).toBeDisabled();
+    // The last remaining line cannot be removed.
+    expect(screen.getByRole('button', { name: /^Remove line/ })).toBeDisabled();
   });
 
   it('warns when the same product appears twice', async () => {

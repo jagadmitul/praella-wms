@@ -1,9 +1,22 @@
 import type { Metadata } from 'next';
+import {
+  BulkActionBar,
+  BulkProvider,
+  BulkRowCheckbox,
+  BulkTh,
+} from '@/components/ui/bulk-select';
 import { Card, EmptyState, PageHeader, StatusBadge, Table, Td, Th } from '@/components/ui';
-import { Pagination, SearchFilter, SelectFilter } from '@/components/ui/filters';
+import {
+  ClearFilters,
+  FilterBar,
+  Pagination,
+  SearchFilter,
+  SelectFilter,
+} from '@/components/ui/filters';
 import { TransitionButton } from '@/components/ui/transition-button';
 import { DocumentComposer } from '@/components/orders/document-composer';
 import { getProducts, getSession, getTransfers, getWarehouses } from '@/lib/queries';
+import { bulkTransfersAction } from '@/lib/actions/bulk';
 import { formatDate, formatNumber } from '@/lib/format';
 import { createTransferAction } from '@/lib/actions/orders';
 
@@ -19,15 +32,17 @@ const STATUS_OPTIONS = [
 export default async function TransfersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; page?: string; status?: string }>;
+  searchParams: Promise<{ search?: string; page?: string; status?: string ; pageSize?: string; sortBy?: string; sortDir?: string }>;
 }) {
   const params = await searchParams;
   const page = Number(params.page ?? 1);
+  // Clamped to the API's own cap so a hand-edited URL cannot force a huge scan.
+  const pageSize = Math.min(Number(params.pageSize ?? 20) || 20, 100);
 
   const [session, transfers, products, warehouses] = await Promise.all([
     getSession(),
-    getTransfers({ search: params.search, page, pageSize: 20, status: params.status }),
-    getProducts({ pageSize: 100, sortBy: 'name', sortDir: 'asc' }),
+    getTransfers({ search: params.search, page, pageSize, status: params.status }),
+    getProducts({ pageSize, sortBy: 'name', sortDir: 'asc' }),
     getWarehouses(),
   ]);
 
@@ -61,7 +76,7 @@ export default async function TransfersPage({
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <FilterBar>
         <SearchFilter placeholder="Search by transfer code" />
         <SelectFilter
           name="status"
@@ -69,12 +84,15 @@ export default async function TransfersPage({
           allLabel="All statuses"
           options={STATUS_OPTIONS}
         />
-      </div>
+        <ClearFilters />
+      </FilterBar>
 
-      <Card>
-        <Table>
+      <BulkProvider allIds={transfers.items.map((row) => row.id)}>
+        <Card>
+          <Table>
           <thead>
             <tr>
+              {canTransfer ? <BulkTh /> : null}
               <Th>Transfer</Th>
               <Th>Route</Th>
               <Th>Items</Th>
@@ -87,7 +105,7 @@ export default async function TransfersPage({
           <tbody>
             {transfers.items.length === 0 ? (
               <EmptyState
-                colSpan={canTransfer ? 7 : 6}
+                colSpan={(canTransfer ? 7 : 6) + (canTransfer ? 1 : 0)}
                 title="No transfers found"
                 description="Transfers move stock between two of your warehouses."
               />
@@ -179,14 +197,24 @@ export default async function TransfersPage({
               })
             )}
           </tbody>
-        </Table>
+          </Table>
 
-        <Pagination
+          <Pagination
           page={transfers.meta.page}
           totalPages={transfers.meta.totalPages}
           totalItems={transfers.meta.totalItems}
-        />
-      </Card>
+          pageSize={pageSize}
+          />
+        </Card>
+
+        {canTransfer ? (
+          <BulkActionBar
+            noun="transfer"
+            action={bulkTransfersAction}
+            actions={[{ value: 'dispatch', label: 'Dispatch' }, { value: 'receive', label: 'Receive' }, { value: 'cancel', label: 'Cancel', confirm: 'Cancel the selected transfers?' }]}
+          />
+        ) : null}
+      </BulkProvider>
     </>
   );
 }

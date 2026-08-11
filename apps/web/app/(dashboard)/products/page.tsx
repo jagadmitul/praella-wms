@@ -1,9 +1,23 @@
 import type { Metadata } from 'next';
+import {
+  BulkActionBar,
+  BulkProvider,
+  BulkRowCheckbox,
+  BulkTh,
+} from '@/components/ui/bulk-select';
 import { Badge, Card, EmptyState, Label, PageHeader, Table, Td, Th } from '@/components/ui';
 import { DialogForm, FieldError } from '@/components/ui/dialog-form';
-import { Pagination, SearchFilter, SelectFilter } from '@/components/ui/filters';
+import {
+  ClearFilters,
+  FilterBar,
+  Pagination,
+  SearchFilter,
+  SelectFilter,
+  SortFilter,
+} from '@/components/ui/filters';
 import { createProductAction } from '@/lib/actions/inventory';
 import { getCategories, getProducts, getSession, getSuppliers } from '@/lib/queries';
+import { bulkProductsAction } from '@/lib/actions/bulk';
 import { formatCurrency, formatNumber } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Products' };
@@ -15,22 +29,33 @@ export default async function ProductsPage({
     search?: string;
     page?: string;
     categoryId?: string;
+    supplierId?: string;
+    warehouseId?: string;
+    isActive?: string;
     lowStockOnly?: string;
+    pageSize?: string;
+    sortBy?: string;
+    sortDir?: string;
   }>;
 }) {
   const params = await searchParams;
   const page = Number(params.page ?? 1);
+  // Clamped to the API's own cap so a hand-edited URL cannot force a huge scan.
+  const pageSize = Math.min(Number(params.pageSize ?? 20) || 20, 100);
 
   const [session, products, categories, suppliers] = await Promise.all([
     getSession(),
     getProducts({
       search: params.search,
       page,
-      pageSize: 20,
+      pageSize,
       categoryId: params.categoryId,
+      supplierId: params.supplierId,
+      warehouseId: params.warehouseId,
+      isActive: params.isActive,
       lowStockOnly: params.lowStockOnly,
-      sortBy: 'name',
-      sortDir: 'asc',
+      sortBy: params.sortBy ?? 'name',
+      sortDir: (params.sortDir as 'asc' | 'desc') ?? 'asc',
     }),
     getCategories(),
     getSuppliers(),
@@ -142,7 +167,7 @@ export default async function ProductsPage({
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <FilterBar>
         <SearchFilter placeholder="Search name, SKU or description" />
         <SelectFilter
           name="categoryId"
@@ -154,17 +179,47 @@ export default async function ProductsPage({
           }))}
         />
         <SelectFilter
+          name="supplierId"
+          label="Supplier"
+          allLabel="All suppliers"
+          options={suppliers.items.map((supplier) => ({
+            value: supplier.id,
+            label: supplier.name,
+          }))}
+        />
+        <SelectFilter
           name="lowStockOnly"
           label="Stock"
           allLabel="All stock levels"
           options={[{ value: 'true', label: 'Below threshold only' }]}
         />
-      </div>
+        <SelectFilter
+          name="isActive"
+          label="State"
+          allLabel="Active and archived"
+          options={[
+            { value: 'true', label: 'Active only' },
+            { value: 'false', label: 'Archived only' },
+          ]}
+        />
+        <SortFilter
+          options={[
+            { value: 'name', label: 'Name' },
+            { value: 'sku', label: 'SKU' },
+            { value: 'unitPrice', label: 'Unit price' },
+            { value: 'createdAt', label: 'Created' },
+            { value: 'updatedAt', label: 'Updated' },
+          ]}
+        />
+        <ClearFilters />
+      </FilterBar>
 
-      <Card>
-        <Table>
+      <BulkProvider allIds={products.items.map((row) => row.id)}>
+        <Card>
+          <Table>
           <thead>
             <tr>
+              {can('product:update') ? <BulkTh /> : null}
               <Th>Product</Th>
               <Th>Category</Th>
               <Th>Supplier</Th>
@@ -178,13 +233,18 @@ export default async function ProductsPage({
           <tbody>
             {products.items.length === 0 ? (
               <EmptyState
-                colSpan={8}
+                colSpan={8 + (can('product:update') ? 1 : 0)}
                 title="No products found"
                 description="Adjust your filters, or add the first product to your catalogue."
               />
             ) : (
               products.items.map((product) => (
                 <tr key={product.id}>
+                    {can('product:update') ? (
+                      <Td className="w-10">
+                        <BulkRowCheckbox id={product.id} label={product.sku} />
+                      </Td>
+                    ) : null}
                   <Td>
                     <div className="flex items-center gap-2">
                       <div>
@@ -232,14 +292,24 @@ export default async function ProductsPage({
               ))
             )}
           </tbody>
-        </Table>
+          </Table>
 
-        <Pagination
+          <Pagination
           page={products.meta.page}
           totalPages={products.meta.totalPages}
           totalItems={products.meta.totalItems}
-        />
-      </Card>
+          pageSize={pageSize}
+          />
+        </Card>
+
+        {can('product:update') ? (
+          <BulkActionBar
+            noun="product"
+            action={bulkProductsAction}
+            actions={[{ value: 'archive', label: 'Archive', confirm: 'Archive the selected products?' }, { value: 'activate', label: 'Restore to active' }]}
+          />
+        ) : null}
+      </BulkProvider>
     </>
   );
 }

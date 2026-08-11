@@ -1,6 +1,18 @@
 import type { Metadata } from 'next';
+import {
+  BulkActionBar,
+  BulkProvider,
+  BulkRowCheckbox,
+  BulkTh,
+} from '@/components/ui/bulk-select';
 import { Card, EmptyState, PageHeader, StatusBadge, Table, Td, Th } from '@/components/ui';
-import { Pagination, SearchFilter, SelectFilter } from '@/components/ui/filters';
+import {
+  ClearFilters,
+  FilterBar,
+  Pagination,
+  SearchFilter,
+  SelectFilter,
+} from '@/components/ui/filters';
 import { TransitionButton } from '@/components/ui/transition-button';
 import { DocumentComposer } from '@/components/orders/document-composer';
 import {
@@ -10,6 +22,7 @@ import {
   getSuppliers,
   getWarehouses,
 } from '@/lib/queries';
+import { bulkPurchaseOrdersAction } from '@/lib/actions/bulk';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/format';
 import { createPurchaseOrderAction } from '@/lib/actions/orders';
 
@@ -26,20 +39,22 @@ const STATUS_OPTIONS = [
 export default async function PurchaseOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; page?: string; status?: string }>;
+  searchParams: Promise<{ search?: string; page?: string; status?: string ; pageSize?: string; sortBy?: string; sortDir?: string }>;
 }) {
   const params = await searchParams;
   const page = Number(params.page ?? 1);
+  // Clamped to the API's own cap so a hand-edited URL cannot force a huge scan.
+  const pageSize = Math.min(Number(params.pageSize ?? 20) || 20, 100);
 
   const [session, orders, products, warehouses, suppliers] = await Promise.all([
     getSession(),
     getPurchaseOrders({
       search: params.search,
       page,
-      pageSize: 20,
+      pageSize,
       status: params.status,
     }),
-    getProducts({ pageSize: 100, sortBy: 'name', sortDir: 'asc' }),
+    getProducts({ pageSize, sortBy: 'name', sortDir: 'asc' }),
     getWarehouses(),
     getSuppliers(),
   ]);
@@ -81,7 +96,7 @@ export default async function PurchaseOrdersPage({
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <FilterBar>
         <SearchFilter placeholder="Search by order code or supplier" />
         <SelectFilter
           name="status"
@@ -89,12 +104,15 @@ export default async function PurchaseOrdersPage({
           allLabel="All statuses"
           options={STATUS_OPTIONS}
         />
-      </div>
+        <ClearFilters />
+      </FilterBar>
 
-      <Card>
-        <Table>
+      <BulkProvider allIds={orders.items.map((row) => row.id)}>
+        <Card>
+          <Table>
           <thead>
             <tr>
+              {canManage ? <BulkTh /> : null}
               <Th>Order</Th>
               <Th>Supplier</Th>
               <Th>Destination</Th>
@@ -109,7 +127,7 @@ export default async function PurchaseOrdersPage({
           <tbody>
             {orders.items.length === 0 ? (
               <EmptyState
-                colSpan={showActions ? 9 : 8}
+                colSpan={(showActions ? 9 : 8) + (showActions ? 1 : 0)}
                 title="No purchase orders found"
                 description="Purchase orders bring stock into a warehouse from a supplier."
               />
@@ -198,14 +216,24 @@ export default async function PurchaseOrdersPage({
               })
             )}
           </tbody>
-        </Table>
+          </Table>
 
-        <Pagination
+          <Pagination
           page={orders.meta.page}
           totalPages={orders.meta.totalPages}
           totalItems={orders.meta.totalItems}
-        />
-      </Card>
+          pageSize={pageSize}
+          />
+        </Card>
+
+        {canManage ? (
+          <BulkActionBar
+            noun="order"
+            action={bulkPurchaseOrdersAction}
+            actions={[{ value: 'submit', label: 'Submit to supplier' }, { value: 'receive', label: 'Receive in full' }, { value: 'cancel', label: 'Cancel', confirm: 'Cancel the selected orders?' }]}
+          />
+        ) : null}
+      </BulkProvider>
     </>
   );
 }

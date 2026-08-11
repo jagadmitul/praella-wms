@@ -1,10 +1,13 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Paginated, ProductView } from '@wms/contracts';
+import { bulkUpdateProductsSchema, type BulkResult, type Paginated, type ProductView } from '@wms/contracts';
+import { createZodDto } from 'nestjs-zod';
 import { CurrentOrg, CurrentUser, RequirePermissions } from '../common/decorators';
 import type { OrgContext, RequestUser } from '../common/types/request-context';
 import { ProductsService, type ProductDeletionResult } from './products.service';
 import { CreateProductDto, ProductQueryDto, UpdateProductDto } from './dto/product.dto';
+
+class BulkUpdateProductsDto extends createZodDto(bulkUpdateProductsSchema) {}
 
 @ApiTags('Products')
 @ApiBearerAuth('access-token')
@@ -58,6 +61,21 @@ export class ProductsController {
     @Body() body: UpdateProductDto,
   ): Promise<ProductView> {
     return this.productsService.update(orgContext, user.id, id, body);
+  }
+
+  @Post('bulk')
+  @RequirePermissions('product:update')
+  @ApiOperation({
+    summary: 'Apply the same change to many products',
+    description:
+      'Each product is updated independently and the response reports per-item outcomes — one product in an unexpected state does not roll back the rest.',
+  })
+  async bulkUpdate(
+    @CurrentOrg() orgContext: OrgContext,
+    @CurrentUser() user: RequestUser,
+    @Body() body: BulkUpdateProductsDto,
+  ): Promise<BulkResult> {
+    return this.productsService.bulkUpdate(orgContext, user.id, body);
   }
 
   @Delete(':id')

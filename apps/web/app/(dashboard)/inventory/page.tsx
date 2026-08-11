@@ -1,7 +1,14 @@
 import type { Metadata } from 'next';
 import { Badge, Card, EmptyState, Label, PageHeader, Table, Td, Th } from '@/components/ui';
 import { DialogForm, FieldError } from '@/components/ui/dialog-form';
-import { Pagination, SearchFilter, SelectFilter } from '@/components/ui/filters';
+import {
+  ClearFilters,
+  FilterBar,
+  Pagination,
+  SearchFilter,
+  SelectFilter,
+  SortFilter,
+} from '@/components/ui/filters';
 import {
   adjustStockAction,
   recordMovementAction,
@@ -15,23 +22,36 @@ export const metadata: Metadata = { title: 'Stock levels' };
 export default async function InventoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; page?: string; warehouseId?: string }>;
+  searchParams: Promise<{
+    search?: string;
+    page?: string;
+    warehouseId?: string;
+    categoryId?: string;
+    belowThreshold?: string;
+    pageSize?: string;
+    sortBy?: string;
+    sortDir?: string;
+  }>;
 }) {
   const params = await searchParams;
   const page = Number(params.page ?? 1);
+  // Clamped to the API's own cap so a hand-edited URL cannot force a huge scan.
+  const pageSize = Math.min(Number(params.pageSize ?? 25) || 25, 100);
 
   const [session, levels, warehouses, products] = await Promise.all([
     getSession(),
     getStockLevels({
       search: params.search,
       page,
-      pageSize: 25,
+      pageSize,
       warehouseId: params.warehouseId,
-      sortBy: 'quantity',
-      sortDir: 'desc',
+      categoryId: params.categoryId,
+      belowThreshold: params.belowThreshold,
+      sortBy: params.sortBy ?? 'quantity',
+      sortDir: (params.sortDir as 'asc' | 'desc') ?? 'desc',
     }),
     getWarehouses(),
-    getProducts({ pageSize: 100, sortBy: 'name', sortDir: 'asc' }),
+    getProducts({ pageSize, sortBy: 'name', sortDir: 'asc' }),
   ]);
 
   const can = (permission: string) =>
@@ -197,7 +217,7 @@ export default async function InventoryPage({
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <FilterBar>
         <SearchFilter placeholder="Search product or SKU" />
         <SelectFilter
           name="warehouseId"
@@ -205,7 +225,21 @@ export default async function InventoryPage({
           allLabel="All warehouses"
           options={warehouseOptions}
         />
-      </div>
+        <SelectFilter
+          name="belowThreshold"
+          label="Stock"
+          allLabel="All stock levels"
+          options={[{ value: 'true', label: 'Below threshold only' }]}
+        />
+        <SortFilter
+          options={[
+            { value: 'quantity', label: 'Quantity' },
+            { value: 'reorderPoint', label: 'Threshold' },
+            { value: 'updatedAt', label: 'Updated' },
+          ]}
+        />
+        <ClearFilters />
+      </FilterBar>
 
       <Card>
         <Table>
@@ -285,6 +319,7 @@ export default async function InventoryPage({
           page={levels.meta.page}
           totalPages={levels.meta.totalPages}
           totalItems={levels.meta.totalItems}
+          pageSize={pageSize}
         />
       </Card>
     </>

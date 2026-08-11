@@ -342,10 +342,10 @@ export function DocumentComposer({
                     <div
                       key={line.key}
                       className={cn(
-                        'grid items-end gap-2 rounded-lg border border-line bg-surface-sunken p-2.5',
+                        'grid items-end gap-x-3 gap-y-2 rounded-lg border border-line bg-surface-sunken p-3',
                         carriesMoney
-                          ? 'sm:grid-cols-[1fr_5rem_7rem_6rem_2rem]'
-                          : 'sm:grid-cols-[1fr_6rem_2rem]',
+                          ? 'sm:grid-cols-[minmax(0,1fr)_5.5rem_7.5rem_7rem_2.25rem]'
+                          : 'sm:grid-cols-[minmax(0,1fr)_6rem_3rem_2.25rem]',
                       )}
                     >
                       <div className="min-w-0">
@@ -415,23 +415,36 @@ export function DocumentComposer({
                           </div>
                         </>
                       ) : (
-                        <span className="hidden text-xs text-ink-400 sm:block">
+                        <span className="hidden pb-2.5 text-xs text-ink-400 sm:block">
                           {product?.unit ?? ''}
                         </span>
                       )}
 
+                      {/*
+                        Sits on the grid baseline with the inputs rather than
+                        floating in its own row, and is a real 36px target with
+                        visible hover, focus and disabled states.
+                      */}
                       <button
                         type="button"
-                        aria-label="Remove line"
+                        aria-label={`Remove line ${line.key}`}
+                        title="Remove line"
                         disabled={lines.length === 1}
                         onClick={() =>
                           setLines((current) =>
                             current.filter((candidate) => candidate.key !== line.key),
                           )
                         }
-                        className="h-9 rounded-lg text-ink-400 transition-colors hover:bg-danger-50 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="mt-2 grid size-9 shrink-0 place-items-center justify-self-end rounded-lg text-ink-400 transition-colors hover:bg-danger-50 hover:text-danger-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-400 sm:mt-0"
                       >
-                        ✕
+                        <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden>
+                          <path
+                            d="M5.5 5.5l9 9m0-9l-9 9"
+                            stroke="currentColor"
+                            strokeWidth="1.75"
+                            strokeLinecap="round"
+                          />
+                        </svg>
                       </button>
                     </div>
                   );

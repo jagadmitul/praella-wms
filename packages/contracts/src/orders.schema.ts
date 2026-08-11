@@ -131,3 +131,19 @@ export const salesOrderQuerySchema = paginationQuerySchema.extend({
   warehouseId: idSchema.optional(),
 });
 export type SalesOrderQuery = z.infer<typeof salesOrderQuerySchema>;
+
+/* -------------------------------------------------------------------------- */
+/*                            Bulk state transitions                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Runs the same lifecycle transition across many documents.
+ *
+ * Each document is processed independently so one that is in the wrong state
+ * does not abort the rest — the response says exactly which succeeded.
+ */
+export const bulkTransitionSchema = z.object({
+  ids: z.array(idSchema).min(1, 'Select at least one record').max(100),
+  transition: z.string().min(1),
+});
+export type BulkTransitionInput = z.infer<typeof bulkTransitionSchema>;

@@ -9,10 +9,12 @@ export const metadata: Metadata = { title: 'Background jobs' };
 export default async function JobsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string ; pageSize?: string; sortBy?: string; sortDir?: string }>;
 }) {
-  const { page } = await searchParams;
-  const jobs = await getJobs({ page: Number(page ?? 1), pageSize: 20 });
+  const params = await searchParams;
+  const page = Number(params.page ?? 1);
+  const pageSize = Math.min(Number(params.pageSize ?? 20) || 20, 100);
+  const jobs = await getJobs({ page, pageSize });
 
   return (
     <>
@@ -97,6 +99,7 @@ export default async function JobsPage({
           page={jobs.meta.page}
           totalPages={jobs.meta.totalPages}
           totalItems={jobs.meta.totalItems}
+          pageSize={pageSize}
         />
       </Card>
     </>

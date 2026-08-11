@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { Permission } from '@wms/contracts';
 import { cn } from '@/lib/cn';
@@ -52,6 +52,26 @@ const NAVIGATION: NavGroup[] = [
     ],
   },
 ];
+
+/**
+ * Shows a spinner inside the link the user just clicked.
+ *
+ * `useLinkStatus` reports the pending state of the enclosing Link, which ties
+ * the indicator to the item that was actually clicked rather than showing a
+ * generic global bar.
+ */
+function LinkSpinner() {
+  const { pending } = useLinkStatus();
+
+  if (!pending) return null;
+
+  return (
+    <span
+      aria-hidden
+      className="ml-auto size-3 shrink-0 animate-spin rounded-full border-[1.5px] border-white/30 border-t-white/80"
+    />
+  );
+}
 
 /**
  * Primary navigation.
@@ -109,13 +129,14 @@ export function Sidebar({
                         href={item.href}
                         aria-current={isActive ? 'page' : undefined}
                         className={cn(
-                          'block rounded-lg px-2.5 py-2 text-sm transition-colors',
+                          'flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors',
                           isActive
                             ? 'bg-white/10 font-medium text-white'
                             : 'text-white/55 hover:bg-white/5 hover:text-white/85',
                         )}
                       >
                         {item.label}
+                        <LinkSpinner />
                       </Link>
                     </li>
                   );

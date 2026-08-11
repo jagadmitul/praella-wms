@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import type {
   BulkJobView,
   CategoryView,
@@ -28,30 +29,41 @@ import { apiFetch, buildQuery } from './api';
 
 export type ListParams = Record<string, string | number | boolean | undefined>;
 
-/** The signed-in user, their active organisation, role and permissions. */
-export function getSession(): Promise<CurrentSession> {
-  return apiFetch<CurrentSession>('/auth/me');
-}
+/**
+ * The signed-in user, their active organisation, role and permissions.
+ *
+ * Wrapped in React's `cache` so the dashboard layout and the page it renders
+ * share one request instead of each making their own. That was two round trips
+ * to the API on every single navigation — the single largest avoidable cost in
+ * the app, and very visible once the API is a network hop away rather than
+ * localhost.
+ */
+export const getSession = cache((): Promise<CurrentSession> =>
+  apiFetch<CurrentSession>('/auth/me'),
+);
 
 export function getDashboard(): Promise<DashboardSummaryView> {
   return apiFetch<DashboardSummaryView>('/reports/dashboard');
 }
 
-export function getWarehouses(params: ListParams = {}): Promise<Paginated<WarehouseView>> {
-  return apiFetch(`/warehouses${buildQuery({ pageSize: 100, ...params })}`);
-}
+export const getWarehouses = cache(
+  (params: ListParams = {}): Promise<Paginated<WarehouseView>> =>
+    apiFetch(`/warehouses${buildQuery({ pageSize: 100, ...params })}`),
+);
 
 export function getProducts(params: ListParams = {}): Promise<Paginated<ProductView>> {
   return apiFetch(`/products${buildQuery(params)}`);
 }
 
-export function getCategories(params: ListParams = {}): Promise<Paginated<CategoryView>> {
-  return apiFetch(`/categories${buildQuery({ pageSize: 100, ...params })}`);
-}
+export const getCategories = cache(
+  (params: ListParams = {}): Promise<Paginated<CategoryView>> =>
+    apiFetch(`/categories${buildQuery({ pageSize: 100, ...params })}`),
+);
 
-export function getSuppliers(params: ListParams = {}): Promise<Paginated<SupplierView>> {
-  return apiFetch(`/suppliers${buildQuery({ pageSize: 100, ...params })}`);
-}
+export const getSuppliers = cache(
+  (params: ListParams = {}): Promise<Paginated<SupplierView>> =>
+    apiFetch(`/suppliers${buildQuery({ pageSize: 100, ...params })}`),
+);
 
 export function getStockLevels(params: ListParams = {}): Promise<Paginated<StockLevelView>> {
   return apiFetch(`/stock/levels${buildQuery(params)}`);

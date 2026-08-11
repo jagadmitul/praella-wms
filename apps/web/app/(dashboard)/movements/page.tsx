@@ -1,6 +1,13 @@
 import type { Metadata } from 'next';
 import { Badge, Card, EmptyState, PageHeader, Table, Td, Th } from '@/components/ui';
-import { Pagination, SearchFilter, SelectFilter } from '@/components/ui/filters';
+import {
+  ClearFilters,
+  DateFilter,
+  FilterBar,
+  Pagination,
+  SearchFilter,
+  SelectFilter,
+} from '@/components/ui/filters';
 import { getMovements, getWarehouses } from '@/lib/queries';
 import { formatCurrency, formatDateTime, formatNumber, humanise } from '@/lib/format';
 
@@ -30,18 +37,27 @@ export default async function MovementsPage({
     page?: string;
     warehouseId?: string;
     type?: string;
+    from?: string;
+    to?: string;
+    pageSize?: string;
+    sortBy?: string;
+    sortDir?: string;
   }>;
 }) {
   const params = await searchParams;
   const page = Number(params.page ?? 1);
+  // Clamped to the API's own cap so a hand-edited URL cannot force a huge scan.
+  const pageSize = Math.min(Number(params.pageSize ?? 25) || 25, 100);
 
   const [movements, warehouses] = await Promise.all([
     getMovements({
       search: params.search,
       page,
-      pageSize: 25,
+      pageSize,
       warehouseId: params.warehouseId,
       type: params.type,
+      from: params.from,
+      to: params.to,
     }),
     getWarehouses(),
   ]);
@@ -53,7 +69,7 @@ export default async function MovementsPage({
         description="The append-only stock ledger. Rows are never edited or deleted, so the signed sum of movements always reconciles to the quantity on the shelf."
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <FilterBar>
         <SearchFilter placeholder="Search product, SKU, reference or note" />
         <SelectFilter
           name="warehouseId"
@@ -65,7 +81,10 @@ export default async function MovementsPage({
           }))}
         />
         <SelectFilter name="type" label="Type" allLabel="All types" options={TYPE_OPTIONS} />
-      </div>
+        <DateFilter name="from" label="From" />
+        <DateFilter name="to" label="To" />
+        <ClearFilters />
+      </FilterBar>
 
       <Card>
         <Table>
@@ -152,6 +171,7 @@ export default async function MovementsPage({
           page={movements.meta.page}
           totalPages={movements.meta.totalPages}
           totalItems={movements.meta.totalItems}
+          pageSize={pageSize}
         />
       </Card>
     </>

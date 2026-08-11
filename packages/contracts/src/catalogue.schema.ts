@@ -136,3 +136,24 @@ export const productQuerySchema = paginationQuerySchema.extend({
     .optional(),
 });
 export type ProductQuery = z.infer<typeof productQuerySchema>;
+
+/* -------------------------------------------------------------------------- */
+/*                                Bulk actions                                */
+/* -------------------------------------------------------------------------- */
+
+/** Applies the same change to many products at once. */
+export const bulkUpdateProductsSchema = z
+  .object({
+    ids: z.array(idSchema).min(1, 'Select at least one product').max(200),
+    isActive: z.boolean().optional(),
+    categoryId: idSchema.nullable().optional(),
+    supplierId: idSchema.nullable().optional(),
+  })
+  .refine(
+    (value) =>
+      value.isActive !== undefined ||
+      value.categoryId !== undefined ||
+      value.supplierId !== undefined,
+    { message: 'Choose at least one field to change' },
+  );
+export type BulkUpdateProductsInput = z.infer<typeof bulkUpdateProductsSchema>;

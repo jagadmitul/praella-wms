@@ -1,10 +1,28 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Paginated, StockTransferView } from '@wms/contracts';
+import { createZodDto } from 'nestjs-zod';
+import {
+  bulkTransitionSchema,
+  type BulkResult,
+  type Paginated,
+  type StockTransferView,
+} from '@wms/contracts';
+import { runBulk } from '../common/services/bulk.util';
+
 import { CurrentOrg, CurrentUser, RequirePermissions } from '../common/decorators';
 import type { OrgContext, RequestUser } from '../common/types/request-context';
 import { TransfersService } from './transfers.service';
 import { CreateTransferDto, TransferQueryDto } from './dto/transfer.dto';
+
+class BulkTransitionDto extends createZodDto(bulkTransitionSchema) {}
 
 @ApiTags('Stock transfers')
 @ApiBearerAuth('access-token')
@@ -73,6 +91,38 @@ export class TransfersController {
     @Param('id') id: string,
   ): Promise<StockTransferView> {
     return this.transfersService.receive(orgContext, user.id, id);
+  }
+
+  @Post('bulk')
+  @RequirePermissions('stock:transfer')
+  @ApiOperation({
+    summary: 'Run one transition across many transfers',
+    description: 'Supported transitions: dispatch, receive, cancel.',
+  })
+  async bulk(
+    @CurrentOrg() orgContext: OrgContext,
+    @CurrentUser() user: RequestUser,
+    @Body() body: BulkTransitionDto,
+  ): Promise<BulkResult> {
+    const allowed = ['dispatch', 'receive', 'cancel'] as const;
+    if (!allowed.includes(body.transition as (typeof allowed)[number])) {
+      throw new BadRequestException(
+        `Unsupported transition "${body.transition}". Use one of: ${allowed.join(', ')}`,
+      );
+    }
+
+    return runBulk(
+      body.ids.map((id) => ({ id, label: id })),
+      async (item) => {
+        if (body.transition === 'dispatch') {
+          await this.transfersService.dispatch(orgContext, user.id, item.id);
+        } else if (body.transition === 'receive') {
+          await this.transfersService.receive(orgContext, user.id, item.id);
+        } else {
+          await this.transfersService.cancel(orgContext, user.id, item.id);
+        }
+      },
+    );
   }
 
   @Post(':id/cancel')

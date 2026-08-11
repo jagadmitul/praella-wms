@@ -143,3 +143,24 @@ export const versionedSchema = z.object({
   expectedVersion: z.coerce.number().int().positive().optional(),
 });
 export type Versioned = z.infer<typeof versionedSchema>;
+
+/**
+ * Result of a bulk operation.
+ *
+ * Bulk actions report per-item outcomes rather than a single pass/fail. Ten
+ * orders where three are in the wrong state is the normal case, not an
+ * exception — telling the user "3 failed" without saying which three, and why,
+ * makes the feature untrustworthy.
+ */
+export interface BulkResult {
+  requested: number;
+  succeeded: number;
+  failed: number;
+  results: Array<{
+    id: string;
+    /** Human-readable label, so the UI need not re-fetch to name a failure. */
+    label: string;
+    ok: boolean;
+    message?: string;
+  }>;
+}

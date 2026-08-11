@@ -1,3 +1,5 @@
+import type { BulkResult } from '@wms/contracts';
+
 /**
  * Form state shared by every Server Action.
  *
@@ -9,6 +11,8 @@ export interface ActionState {
   status: 'idle' | 'success' | 'error';
   message?: string;
   fieldErrors?: Record<string, string>;
+  /** Per-record outcomes, returned by bulk actions. */
+  result?: BulkResult;
 }
 
 /** Initial state passed to `useActionState`. */

@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type {
+  BulkResult,
+  BulkUpdateProductsInput,
   CreateProductInput,
   Paginated,
   ProductQuery,
@@ -13,6 +15,7 @@ import { buildOrderBy, paginate, toPrismaPage } from '../common/utils/pagination
 import { toMoneyString } from '../common/utils/decimal.util';
 import { warehouseScopeFilter } from '../common/utils/warehouse-scope.util';
 import { belowThresholdFilter } from '../stock/stock.service';
+import { runBulk } from '../common/services/bulk.util';
 import type { OrgContext } from '../common/types/request-context';
 import type { Prisma } from '../generated/prisma/client';
 
@@ -283,6 +286,67 @@ export class ProductsService {
       archived: true,
       message: `Product "${product.name}" has ${movements} movement(s) of recorded history and ${units} unit(s) on hand, so it was archived rather than deleted. Its stock ledger is preserved.`,
     };
+  }
+
+  /**
+   * Applies the same change to many products.
+   *
+   * @param orgContext - Resolved organisation context.
+   * @param actorId - User performing the action.
+   * @param input - Ids and the fields to change.
+   * @returns Per-product outcomes.
+   */
+  async bulkUpdate(
+    orgContext: OrgContext,
+    actorId: string,
+    input: BulkUpdateProductsInput,
+  ): Promise<BulkResult> {
+    await this.assertReferencesBelongToOrg(
+      orgContext,
+      input.categoryId ?? undefined,
+      input.supplierId ?? undefined,
+    );
+
+    // Scoped to the organisation up front, so an id belonging to another tenant
+    // simply is not in the working set.
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: input.ids }, organizationId: orgContext.organizationId },
+      select: { id: true, sku: true, name: true },
+    });
+
+    const result = await runBulk(
+      products.map((product) => ({ id: product.id, label: product.sku })),
+      async (item) => {
+        await this.prisma.product.update({
+          where: { id: item.id },
+          data: {
+            ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
+            ...(input.categoryId === undefined ? {} : { categoryId: input.categoryId }),
+            ...(input.supplierId === undefined ? {} : { supplierId: input.supplierId }),
+          },
+        });
+      },
+    );
+
+    // Ids the caller sent that do not exist here are reported, not ignored.
+    const found = new Set(products.map((product) => product.id));
+    for (const id of input.ids.filter((candidate) => !found.has(candidate))) {
+      result.results.push({
+        id,
+        label: id,
+        ok: false,
+        message: 'Not found in this organisation',
+      });
+      result.failed += 1;
+    }
+    result.requested = input.ids.length;
+
+    await this.afterMutation(orgContext, actorId, 'product.bulk_updated', 'bulk', {
+      count: result.succeeded,
+      changed: Object.keys(input).filter((key) => key !== 'ids'),
+    });
+
+    return result;
   }
 
   private async assertExists(
