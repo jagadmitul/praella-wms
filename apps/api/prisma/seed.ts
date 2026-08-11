@@ -638,19 +638,47 @@ async function main(): Promise<void> {
   /* ---------------------- Materialise ledger → stock levels ------------------ */
 
   console.log(`› Writing ${ledger.movements.length} stock movements…`);
-  // Sorted so `balanceAfter` reads monotonically when the history is viewed by
-  // creation time.
-  const orderedMovements = [...ledger.movements].sort(
-    (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+  // The generators emit movements grouped by document — purchase orders, then
+  // transfers, then manual corrections — so generation order is not
+  // chronological order. `balanceAfter` has to be a running balance in the
+  // order a reader sees the history, which means sorting first and only then
+  // computing it. Doing it the other way round leaves a ledger whose totals are
+  // right (addition commutes) but whose intermediate balances read as nonsense.
+  const generationOrder = new Map(
+    ledger.movements.map((movement, index) => [movement, index]),
   );
+  const orderedMovements = [...ledger.movements].sort((a, b) => {
+    const byTime = a.createdAt.getTime() - b.createdAt.getTime();
+    // Falls back to generation order so a reseed is byte-identical.
+    return byTime !== 0
+      ? byTime
+      : generationOrder.get(a)! - generationOrder.get(b)!;
+  });
+
+  const runningBalances = new Map<string, number>();
+  for (const movement of orderedMovements) {
+    const composite = `${movement.productId}::${movement.warehouseId}`;
+    const isInbound =
+      movement.type === MovementType.INBOUND ||
+      movement.type === MovementType.TRANSFER_IN;
+    const next =
+      (runningBalances.get(composite) ?? 0) +
+      (isInbound ? movement.quantity : -movement.quantity);
+    runningBalances.set(composite, next);
+    movement.balanceAfter = next;
+  }
+
   await prisma.stockMovement.createMany({ data: orderedMovements });
 
   console.log('› Materialising stock levels from the ledger…');
   const reorderBySku = new Map(PRODUCT_SEEDS.map((seed) => [seed.sku, seed]));
-  const stockLevelRows = ledger.entries().map(({ key, quantity }) => {
+  const stockLevelRows = ledger.entries().map(({ key }) => {
     const product = products.find((candidate) => candidate.id === key.productId)!;
     const seed = reorderBySku.get(product.sku)!;
     const composite = `${key.productId}::${key.warehouseId}`;
+    // Read back from the chronological pass, so the stored level is exactly the
+    // balance the last movement in the history reports.
+    const quantity = runningBalances.get(composite) ?? 0;
     return {
       organizationId: organization.id,
       productId: key.productId,
