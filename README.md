@@ -30,7 +30,7 @@ Postgres runs on **5437** and Redis on **6381** to avoid clashing with anything 
 
 ```bash
 pnpm build / typecheck / lint
-pnpm test                 # 74 unit + frontend
+pnpm test                 # 78 unit + frontend
 pnpm --filter @wms/api openapi   # regenerate apps/api/openapi.json
 pnpm test:e2e             # 86 integration (needs Docker)
 pnpm db:migrate | db:deploy | db:seed | db:studio | db:dump
@@ -130,7 +130,7 @@ It does not invent stock numbers: it generates a chronological ledger and derive
 
 ## Testing
 
-**160 tests, all passing** — 86 integration, 52 API unit, 22 frontend.
+**164 tests, all passing** — 86 integration, 52 API unit, 26 frontend.
 
 Weighted towards integration on purpose: guard ordering, tenant scoping and transactional stock arithmetic are exactly what a mock-heavy unit test cannot see. Integration specs run the real application against a real PostgreSQL database (`wms_test`, created and migrated automatically) over HTTP.
 
