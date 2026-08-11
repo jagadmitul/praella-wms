@@ -16,6 +16,13 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json tsconfig.base.js
 COPY packages/contracts/package.json packages/contracts/
 COPY apps/api/package.json apps/api/
 
+# The API's `postinstall` runs `prisma generate`, so the schema and its config
+# have to exist before dependencies are installed. They are copied separately
+# from the rest of the source so the install layer still caches on lockfile
+# changes alone.
+COPY apps/api/prisma apps/api/prisma
+COPY apps/api/prisma.config.ts apps/api/
+
 RUN pnpm install --frozen-lockfile --filter @wms/api... --filter @wms/contracts
 
 COPY packages/contracts packages/contracts
@@ -26,7 +33,12 @@ RUN pnpm --filter @wms/contracts build \
  && pnpm --filter @wms/api build
 
 # Strip development dependencies from the tree we are about to copy forward.
-RUN pnpm install --frozen-lockfile --filter @wms/api... --filter @wms/contracts --prod
+# CI=true is required: pnpm refuses to remove an existing modules directory
+# without a TTY, which is exactly the situation inside a Docker build.
+# `--ignore-scripts` because this prune removes the Prisma CLI itself, and the
+# package's postinstall hook would then try to call it. The client was already
+# generated above and is compiled into dist.
+RUN CI=true pnpm install --frozen-lockfile --filter @wms/api... --filter @wms/contracts --prod --ignore-scripts
 
 # ---------------------------------------------------------------------------
 # Runtime stage
