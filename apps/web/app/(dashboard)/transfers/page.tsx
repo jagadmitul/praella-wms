@@ -115,6 +115,11 @@ export default async function TransfersPage({
 
                 return (
                   <tr key={transfer.id}>
+                    {canTransfer ? (
+                      <Td className="w-10">
+                        <BulkRowCheckbox id={transfer.id} label={transfer.code} />
+                      </Td>
+                    ) : null}
                     <Td>
                       <span className="font-mono text-xs font-medium text-ink-800">
                         {transfer.code}

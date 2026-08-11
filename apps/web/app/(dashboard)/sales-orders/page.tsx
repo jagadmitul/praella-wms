@@ -125,6 +125,11 @@ export default async function SalesOrdersPage({
 
                 return (
                   <tr key={order.id}>
+                    {canManage ? (
+                      <Td className="w-10">
+                        <BulkRowCheckbox id={order.id} label={order.code} />
+                      </Td>
+                    ) : null}
                     <Td>
                       <span className="font-mono text-xs font-medium text-ink-800">
                         {order.code}
