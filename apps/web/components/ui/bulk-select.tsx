@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  createContext,
-  useActionState,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useActionState, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { BulkResult } from '@wms/contracts';
 import { IDLE, type ActionState } from '@/lib/actions/types';
@@ -51,19 +43,19 @@ export function BulkProvider({
   allIds: string[];
   children: ReactNode;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [checked, setSelected] = useState<Set<string>>(new Set());
 
-  // Ids change when the page or filters change; drop anything no longer shown
-  // so a hidden row cannot be acted on by accident.
+  // Ids change when the page or filters change. The visible selection is
+  // narrowed to what is actually on screen by deriving it during render rather
+  // than pruning the stored set from an effect: the guarantee is the same — a
+  // hidden row can never be acted on — without a render pass per page change.
   const key = allIds.join(',');
-  useEffect(() => {
-    setSelected((current) => {
-      const visible = new Set(allIds);
-      const next = new Set([...current].filter((id) => visible.has(id)));
-      return next.size === current.size ? current : next;
-    });
+  const selected = useMemo(() => {
+    const visible = new Set(allIds);
+    return new Set([...checked].filter((id) => visible.has(id)));
+    // `key` stands in for `allIds`, which is a fresh array on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [checked, key]);
 
   const value = useMemo<BulkContextValue>(
     () => ({
@@ -163,17 +155,15 @@ export function BulkActionBar({
   const { selected, clear } = useBulk();
   const [state, formAction] = useActionState(action, IDLE);
   const [choice, setChoice] = useState(actions[0]?.value ?? '');
-  const [report, setReport] = useState<BulkResult | null>(null);
-
-  useEffect(() => {
-    if (state.status === 'idle') return;
-
-    if (state.status === 'success' && state.result) {
-      setReport(state.result);
-      clear();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
+  // The per-item report is the action's own result, so it is read straight off
+  // `state`; only the dismissal needs remembering. `useActionState` hands back a
+  // new object per submission, so identity is a safe marker for "this one has
+  // been read".
+  const [dismissed, setDismissed] = useState<ActionState | null>(null);
+  const report: BulkResult | null =
+    state.status === 'success' && state.result && dismissed !== state
+      ? state.result
+      : null;
 
   if (selected.size === 0 && !report) return null;
 
@@ -181,7 +171,7 @@ export function BulkActionBar({
 
   return (
     <>
-      {selected.size > 0 ? (
+      {selected.size > 0 && !report ? (
         <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4">
           <form
             action={formAction}
@@ -242,7 +232,10 @@ export function BulkActionBar({
             </p>
             <button
               type="button"
-              onClick={() => setReport(null)}
+              onClick={() => {
+                setDismissed(state);
+                clear();
+              }}
               aria-label="Dismiss"
               className="text-ink-400 hover:text-ink-700"
             >

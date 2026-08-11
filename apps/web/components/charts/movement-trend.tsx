@@ -90,10 +90,12 @@ export function MovementTrend({
 
       <div className="mt-2 flex justify-between text-[10px] text-ink-300">
         <span>
-          {new Date(data[0]?.date ?? Date.now()).toLocaleDateString('en-IN', {
-            day: 'numeric',
-            month: 'short',
-          })}
+          {data[0]
+            ? new Date(data[0].date).toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+              })
+            : ''}
         </span>
         <span>Today</span>
       </div>

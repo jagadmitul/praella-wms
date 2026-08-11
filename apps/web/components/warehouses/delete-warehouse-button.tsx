@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionToast } from '@/lib/use-action-toast';
+import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { deleteWarehouseAction } from '@/lib/actions/inventory';
 import { IDLE } from '@/lib/actions/types';
@@ -30,19 +31,7 @@ function Inner({ name }: { name: string }) {
  */
 export function DeleteWarehouseButton({ id, name }: { id: string; name: string }) {
   const [state, formAction] = useActionState(deleteWarehouseAction, IDLE);
-  const [toast, setToast] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
-
-  useEffect(() => {
-    if (state.status === 'idle') return;
-
-    setToast({
-      tone: state.status === 'success' ? 'ok' : 'bad',
-      text: state.message ?? '',
-    });
-
-    const timer = setTimeout(() => setToast(null), 7000);
-    return () => clearTimeout(timer);
-  }, [state]);
+  const toast = useActionToast(state, 7000);
 
   return (
     <>

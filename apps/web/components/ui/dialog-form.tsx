@@ -1,14 +1,7 @@
 'use client';
 
-import {
-  createContext,
-  useActionState,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useActionToast } from '@/lib/use-action-toast';
+import { createContext, useActionState, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
 import { IDLE, type ActionState } from '@/lib/actions/types';
 import { buttonClass, FormError } from './index';
@@ -56,15 +49,15 @@ export function DialogForm({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [state, formAction] = useActionState(action, IDLE);
-  const [toast, setToast] = useState<string | null>(null);
+  const result = useActionToast(state, 5000);
+  // Only successes close the dialog and celebrate; an error has to stay on
+  // screen next to the field that caused it.
+  const toast = result?.tone === 'ok' ? (result.text || 'Saved.') : null;
 
+  // Closing a <dialog> is an imperative DOM call, not state, so it belongs in
+  // an effect — and unlike a setState it costs no extra render.
   useEffect(() => {
-    if (state.status !== 'success') return;
-
-    dialogRef.current?.close();
-    setToast(state.message ?? 'Saved.');
-    const timer = setTimeout(() => setToast(null), 5000);
-    return () => clearTimeout(timer);
+    if (state.status === 'success') dialogRef.current?.close();
   }, [state]);
 
   return (

@@ -67,7 +67,6 @@ export function TableSkeleton({
               key={columnIndex}
               className={cn('h-4 flex-1', columnIndex === 0 && 'max-w-[14rem]')}
               // Slight stagger so the page reads as loading rather than frozen.
-              // eslint-disable-next-line react/forbid-dom-props
             />
           ))}
         </div>

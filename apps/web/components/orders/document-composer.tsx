@@ -1,5 +1,6 @@
 'use client';
 
+import { useActionToast } from '@/lib/use-action-toast';
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { IDLE, type ActionState } from '@/lib/actions/types';
@@ -73,7 +74,8 @@ export function DocumentComposer({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [state, formAction] = useActionState(action, IDLE);
-  const [toast, setToast] = useState<string | null>(null);
+  const result = useActionToast(state, 5000);
+  const toast = result?.tone === 'ok' ? (result.text || 'Created.') : null;
 
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? '');
   const [destinationWarehouseId, setDestinationWarehouseId] = useState(
@@ -89,20 +91,32 @@ export function DocumentComposer({
 
   const carriesMoney = kind !== 'transfer';
 
-  useEffect(() => {
-    if (state.status !== 'success') return;
-
-    dialogRef.current?.close();
-    setToast(state.message ?? 'Created.');
+  /**
+   * Opens the composer on a blank document.
+   *
+   * The reset happens here rather than after a successful save: it is an event
+   * handler, so it costs no extra render pass, and it means a draft abandoned
+   * with the ✕ is not silently resurrected the next time the dialog opens.
+   */
+  const openComposer = (): void => {
     setLines([
-      { key: 1, productId: products[0]?.id ?? '', quantity: '1', amount: products[0]?.unitPrice ?? '0' },
+      {
+        key: 1,
+        productId: products[0]?.id ?? '',
+        quantity: '1',
+        amount: products[0]?.unitPrice ?? '0',
+      },
     ]);
     setCustomerName('');
+    setCustomerEmail('');
     setNotes('');
+    dialogRef.current?.showModal();
+  };
 
-    const timer = setTimeout(() => setToast(null), 5000);
-    return () => clearTimeout(timer);
-  }, [state, products]);
+  // Closing the dialog is imperative DOM, so it stays in an effect.
+  useEffect(() => {
+    if (state.status === 'success') dialogRef.current?.close();
+  }, [state]);
 
   const total = useMemo(
     () =>
@@ -186,7 +200,7 @@ export function DocumentComposer({
       <button
         type="button"
         className={buttonClass('primary')}
-        onClick={() => dialogRef.current?.showModal()}
+        onClick={openComposer}
       >
         {trigger}
       </button>

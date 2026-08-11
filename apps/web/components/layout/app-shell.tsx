@@ -26,12 +26,14 @@ export function AppShell({
   signOut: ReactNode;
   children: ReactNode;
 }) {
-  const [isNavOpen, setNavOpen] = useState(false);
   const pathname = usePathname();
-
-  useEffect(() => {
-    setNavOpen(false);
-  }, [pathname]);
+  // The drawer records the route it was opened on rather than a bare boolean,
+  // so navigating away closes it as a consequence of the new pathname instead
+  // of via an effect that fires a second render on every navigation.
+  const [openedOnPath, setOpenedOnPath] = useState<string | null>(null);
+  const isNavOpen = openedOnPath === pathname;
+  const setNavOpen = (open: boolean): void =>
+    setOpenedOnPath(open ? pathname : null);
 
   // A drawer that scrolls the page behind it feels broken on touch devices.
   useEffect(() => {
@@ -43,7 +45,7 @@ export function AppShell({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setNavOpen(false);
+      if (event.key === 'Escape') setOpenedOnPath(null);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
