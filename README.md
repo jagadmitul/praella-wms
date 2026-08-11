@@ -11,6 +11,23 @@ Built as the practical test for the **Senior Backend Developer** role at Praella
 | **Shared** | One Zod package used by both, so validation rules and the RBAC matrix exist exactly once |
 | **Tests** | **160 passing** — 86 integration, 52 API unit, 22 frontend |
 
+## Live demo
+
+| | |
+| --- | --- |
+| **Dashboard** | **<https://praella-wms.vercel.app>** |
+| **API** | <https://wms-api-9yar.onrender.com/api/v1> |
+| **Swagger** | <https://wms-api-9yar.onrender.com/docs> |
+| **Health** | <https://wms-api-9yar.onrender.com/health> |
+
+Sign in with `admin@praella-wms.dev` / `Praella@2026`, then compare with
+`staff@praella-wms.dev` — same password — to see the access control.
+
+> The API runs on Render's free tier, which sleeps after 15 minutes idle. The
+> first request may take up to a minute while the container wakes; everything
+> after that is fast. Postgres is Neon and Redis is Render Key Value, both in
+> managed regions.
+
 ---
 
 ## Quick start
@@ -279,7 +296,7 @@ RENDER_API_KEY=rnd_xxx DATABASE_URL=postgresql://... ./scripts/deploy.sh
 
 That migrates and seeds the database, provisions Redis, creates the Render service and deploys the dashboard to Vercel.
 
-**Topology:** managed Postgres (Neon) + Redis and the API container on Render + the dashboard on Vercel. The database is deliberately *not* Render's free tier, which expires after 30 days — the wrong property for a demo someone may open weeks later.
+**Topology as deployed:** Postgres on **Neon**, Redis and the API container on **Render**, dashboard on **Vercel**, all auto-deploying from `main`. The database is deliberately *not* Render's free tier, which expires after 30 days — the wrong property for a demo someone may open weeks later.
 
 Manual equivalent:
 
@@ -343,6 +360,16 @@ The **single-choke-point ledger** was the highest-leverage decision. Once `apply
 **Two routes served under the wrong prefix.** `/health` was answering on `/v1/health`, and later `/metrics` had the same problem: URI versioning applies even to routes excluded from the global prefix. Both now use `VERSION_NEUTRAL`. An integration test caught the first; the second I caught only because I went looking after fixing the first.
 
 **A claim in this README that was wrong.** An earlier version stated that Prisma cannot compare two columns, and the low-stock threshold was therefore filtered in JavaScript. Prisma supports field references, and doing it in JS was also a real bug — filtering *after* the page was taken made `totalItems` disagree with the rows returned. Both fixed.
+
+### Deployment notes
+
+Getting the image to build surfaced three bugs worth recording, all caused by the `postinstall` hook that makes a fresh clone work without a manual `prisma generate`:
+
+- `prisma.config.ts` resolved `DATABASE_URL` through Prisma's `env()` helper, which throws as soon as the config file loads. `prisma generate` needs no database, so a missing variable broke both `pnpm install` and the Docker build.
+- The dependency layer ran before the schema was copied, leaving the hook nothing to generate from.
+- The `--prod` prune removes the Prisma CLI and then tried to invoke it, and pnpm refuses to delete a modules directory without a TTY.
+
+The first would have bitten any reviewer who ran `pnpm install` before creating `.env`, so it was worth finding.
 
 ### Time spent
 
