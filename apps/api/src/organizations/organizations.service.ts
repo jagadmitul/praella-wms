@@ -30,7 +30,9 @@ const MEMBER_INCLUDE = {
   },
 } satisfies Prisma.MembershipInclude;
 
-type MemberRow = Prisma.MembershipGetPayload<{ include: typeof MEMBER_INCLUDE }>;
+type MemberRow = Prisma.MembershipGetPayload<{
+  include: typeof MEMBER_INCLUDE;
+}>;
 
 @Injectable()
 export class OrganizationsService {
@@ -133,7 +135,11 @@ export class OrganizationsService {
       this.prisma.membership.count({ where }),
     ]);
 
-    return paginate(rows.map(OrganizationsService.toView), totalItems, query);
+    return paginate(
+      rows.map((row) => OrganizationsService.toView(row)),
+      totalItems,
+      query,
+    );
   }
 
   /**
@@ -168,7 +174,9 @@ export class OrganizationsService {
       });
 
       if (existingMembership) {
-        throw new ConflictException('This person is already a member of the organisation');
+        throw new ConflictException(
+          'This person is already a member of the organisation',
+        );
       }
     }
 
@@ -202,7 +210,9 @@ export class OrganizationsService {
           ...(input.role === 'STAFF' && input.warehouseIds?.length
             ? {
                 warehouses: {
-                  create: input.warehouseIds.map((warehouseId) => ({ warehouseId })),
+                  create: input.warehouseIds.map((warehouseId) => ({
+                    warehouseId,
+                  })),
                 },
               }
             : {}),
@@ -244,12 +254,12 @@ export class OrganizationsService {
     const membership = await this.loadMembership(orgContext, membershipId);
 
     if (input.role && input.role !== membership.role) {
-      await this.assertNotLastAdmin(orgContext, membership.id, membership.role as Role);
+      await this.assertNotLastAdmin(orgContext, membership.id, membership.role);
     }
 
     await this.assertWarehousesInOrg(orgContext, input.warehouseIds ?? []);
 
-    const nextRole = (input.role ?? membership.role) as Role;
+    const nextRole = input.role ?? membership.role;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (input.role) {
@@ -266,7 +276,10 @@ export class OrganizationsService {
       } else if (input.warehouseIds) {
         await tx.warehouseMember.deleteMany({ where: { membershipId } });
         await tx.warehouseMember.createMany({
-          data: input.warehouseIds.map((warehouseId) => ({ membershipId, warehouseId })),
+          data: input.warehouseIds.map((warehouseId) => ({
+            membershipId,
+            warehouseId,
+          })),
           skipDuplicates: true,
         });
       }
@@ -310,7 +323,7 @@ export class OrganizationsService {
       throw new ForbiddenException('You cannot remove your own membership');
     }
 
-    await this.assertNotLastAdmin(orgContext, membership.id, membership.role as Role);
+    await this.assertNotLastAdmin(orgContext, membership.id, membership.role);
 
     await this.prisma.membership.delete({ where: { id: membershipId } });
 
@@ -378,11 +391,16 @@ export class OrganizationsService {
     }
 
     const found = await this.prisma.warehouse.count({
-      where: { id: { in: warehouseIds }, organizationId: orgContext.organizationId },
+      where: {
+        id: { in: warehouseIds },
+        organizationId: orgContext.organizationId,
+      },
     });
 
     if (found !== new Set(warehouseIds).size) {
-      throw new BadRequestException('One or more warehouses do not exist in this organisation');
+      throw new BadRequestException(
+        'One or more warehouses do not exist in this organisation',
+      );
     }
   }
 
@@ -392,7 +410,7 @@ export class OrganizationsService {
       userId: membership.user.id,
       email: membership.user.email,
       fullName: membership.user.fullName,
-      role: membership.role as Role,
+      role: membership.role,
       joinedAt: membership.createdAt.toISOString(),
       warehouses: membership.warehouses.map((link) => link.warehouse),
     };

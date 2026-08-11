@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as argon2 from 'argon2';
 import {
   type AuthSession,
@@ -47,14 +51,19 @@ export class AuthService {
    * @returns The new user and their first token pair.
    * @throws ConflictException when the email is already registered.
    */
-  async signUp(input: SignUpInput, client: TokenClientInfo = {}): Promise<AuthSession> {
+  async signUp(
+    input: SignUpInput,
+    client: TokenClientInfo = {},
+  ): Promise<AuthSession> {
     const existing = await this.prisma.user.findUnique({
       where: { email: input.email },
       select: { id: true },
     });
 
     if (existing) {
-      throw new ConflictException('An account with this email address already exists');
+      throw new ConflictException(
+        'An account with this email address already exists',
+      );
     }
 
     const slug = await uniqueSlug(input.organizationName, async (candidate) => {
@@ -108,7 +117,10 @@ export class AuthService {
    * @returns The user and a fresh token pair.
    * @throws UnauthorizedException when the credentials do not match.
    */
-  async signIn(input: SignInInput, client: TokenClientInfo = {}): Promise<AuthSession> {
+  async signIn(
+    input: SignInInput,
+    client: TokenClientInfo = {},
+  ): Promise<AuthSession> {
     const user = await this.prisma.user.findUnique({
       where: { email: input.email },
       select: { id: true, email: true, passwordHash: true, isActive: true },
@@ -116,7 +128,9 @@ export class AuthService {
 
     // The same error for "no such user" and "wrong password" — anything else
     // turns the sign-in endpoint into an account-enumeration oracle.
-    const invalid = new UnauthorizedException('Incorrect email address or password');
+    const invalid = new UnauthorizedException(
+      'Incorrect email address or password',
+    );
 
     if (!user) {
       // Burn comparable time so response latency does not reveal whether the
@@ -159,9 +173,11 @@ export class AuthService {
 
     // With no explicit context, fall back to the sole membership if there is
     // one, so a single-organisation user gets working permissions immediately.
-    const fallback = user.memberships.length === 1 ? user.memberships[0] : undefined;
+    const fallback =
+      user.memberships.length === 1 ? user.memberships[0] : undefined;
     const role: Role | null = orgContext?.role ?? fallback?.role ?? null;
-    const organizationId = orgContext?.organizationId ?? fallback?.organizationId ?? null;
+    const organizationId =
+      orgContext?.organizationId ?? fallback?.organizationId ?? null;
 
     let warehouseScope: string[] | null = orgContext?.warehouseScope
       ? [...orgContext.warehouseScope]
@@ -219,7 +235,7 @@ export class AuthService {
         organizationId: membership.organization.id,
         organizationName: membership.organization.name,
         organizationSlug: membership.organization.slug,
-        role: membership.role as Role,
+        role: membership.role,
       })),
     };
   }

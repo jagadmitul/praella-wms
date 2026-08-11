@@ -1,11 +1,49 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { bulkUpdateProductsSchema, type BulkResult, type Paginated, type ProductView } from '@wms/contracts';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
+  BulkResultResponse,
+  DeletionResultResponse,
+  ProductListResponse,
+  ProductResponse,
+} from '../common/dto/response.dto';
+import {
+  bulkUpdateProductsSchema,
+  type BulkResult,
+  type Paginated,
+  type ProductView,
+} from '@wms/contracts';
 import { createZodDto } from 'nestjs-zod';
-import { CurrentOrg, CurrentUser, RequirePermissions } from '../common/decorators';
+import {
+  ApiErrors,
+  CurrentOrg,
+  CurrentUser,
+  RequirePermissions,
+} from '../common/decorators';
 import type { OrgContext, RequestUser } from '../common/types/request-context';
-import { ProductsService, type ProductDeletionResult } from './products.service';
-import { CreateProductDto, ProductQueryDto, UpdateProductDto } from './dto/product.dto';
+import {
+  ProductsService,
+  type ProductDeletionResult,
+} from './products.service';
+import {
+  CreateProductDto,
+  ProductQueryDto,
+  UpdateProductDto,
+} from './dto/product.dto';
 
 class BulkUpdateProductsDto extends createZodDto(bulkUpdateProductsSchema) {}
 
@@ -22,7 +60,10 @@ export class ProductsController {
     description:
       'Supports full-text search across name, SKU and description, filtering by category, supplier, warehouse and active state, plus `lowStockOnly=true` to return only products below their replenishment threshold.',
   })
-  @ApiOkResponse({ description: 'Paginated products with per-warehouse stock' })
+  @ApiOkResponse({
+    type: ProductListResponse,
+    description: 'Paginated products with per-warehouse stock',
+  })
   async list(
     @CurrentOrg() orgContext: OrgContext,
     @Query() query: ProductQueryDto,
@@ -31,8 +72,10 @@ export class ProductsController {
   }
 
   @Get(':id')
+  @ApiErrors('notFound')
   @RequirePermissions('product:read')
   @ApiOperation({ summary: 'Get one product with its stock breakdown' })
+  @ApiOkResponse({ type: ProductResponse })
   async findOne(
     @CurrentOrg() orgContext: OrgContext,
     @Param('id') id: string,
@@ -41,8 +84,10 @@ export class ProductsController {
   }
 
   @Post()
+  @ApiErrors('validation', 'badRequest', 'notFound', 'conflict')
   @RequirePermissions('product:create')
   @ApiOperation({ summary: 'Create a product' })
+  @ApiCreatedResponse({ type: ProductResponse })
   async create(
     @CurrentOrg() orgContext: OrgContext,
     @CurrentUser() user: RequestUser,
@@ -52,8 +97,10 @@ export class ProductsController {
   }
 
   @Patch(':id')
+  @ApiErrors('validation', 'badRequest', 'notFound', 'conflict')
   @RequirePermissions('product:update')
   @ApiOperation({ summary: 'Update a product' })
+  @ApiOkResponse({ type: ProductResponse })
   async update(
     @CurrentOrg() orgContext: OrgContext,
     @CurrentUser() user: RequestUser,
@@ -64,12 +111,14 @@ export class ProductsController {
   }
 
   @Post('bulk')
+  @ApiErrors('validation', 'badRequest', 'notFound', 'conflict')
   @RequirePermissions('product:update')
   @ApiOperation({
     summary: 'Apply the same change to many products',
     description:
       'Each product is updated independently and the response reports per-item outcomes — one product in an unexpected state does not roll back the rest.',
   })
+  @ApiOkResponse({ type: BulkResultResponse })
   async bulkUpdate(
     @CurrentOrg() orgContext: OrgContext,
     @CurrentUser() user: RequestUser,
@@ -79,12 +128,14 @@ export class ProductsController {
   }
 
   @Delete(':id')
+  @ApiErrors('badRequest', 'notFound', 'conflict')
   @RequirePermissions('product:delete')
   @ApiOperation({
     summary: 'Delete a product',
     description:
       'Permanently deletes the product when it has no stock and no movement history; otherwise archives it so the ledger stays intact.',
   })
+  @ApiOkResponse({ type: DeletionResultResponse })
   async remove(
     @CurrentOrg() orgContext: OrgContext,
     @CurrentUser() user: RequestUser,

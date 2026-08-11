@@ -1,4 +1,11 @@
-import { Controller, Get, Global, Header, Module, VERSION_NEUTRAL } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Global,
+  Header,
+  Module,
+  VERSION_NEUTRAL,
+} from '@nestjs/common';
 import { ApiExcludeEndpoint, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../common/decorators';
 import { MetricsService } from './metrics.service';

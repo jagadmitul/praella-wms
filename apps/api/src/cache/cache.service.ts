@@ -31,7 +31,8 @@ export class CacheService implements OnModuleDestroy {
     private readonly configService: ConfigService,
     @Optional() @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
   ) {
-    this.defaultTtlSeconds = this.configService.get<number>('CACHE_TTL_SECONDS') ?? 60;
+    this.defaultTtlSeconds =
+      this.configService.get<number>('CACHE_TTL_SECONDS') ?? 60;
   }
 
   /** Whether a Redis connection is available for this process. */
@@ -76,7 +77,9 @@ export class CacheService implements OnModuleDestroy {
         return JSON.parse(cached) as TValue;
       }
     } catch (error: unknown) {
-      this.logger.warn(`Cache read failed for "${key}": ${this.describe(error)}`);
+      this.logger.warn(
+        `Cache read failed for "${key}": ${this.describe(error)}`,
+      );
       return factory();
     }
 
@@ -90,7 +93,9 @@ export class CacheService implements OnModuleDestroy {
         ttlSeconds ?? this.defaultTtlSeconds,
       );
     } catch (error: unknown) {
-      this.logger.warn(`Cache write failed for "${key}": ${this.describe(error)}`);
+      this.logger.warn(
+        `Cache write failed for "${key}": ${this.describe(error)}`,
+      );
     }
 
     return value;

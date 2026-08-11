@@ -17,7 +17,10 @@ import { PrismaClient } from '../generated/prisma/client';
  * where a handful of long transactions must not starve the read traffic.
  */
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(PrismaService.name);
 
   constructor(configService: ConfigService) {
@@ -32,7 +35,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       }),
       log:
         configService.get<string>('NODE_ENV') === 'development'
-          ? [{ emit: 'event', level: 'warn' }, { emit: 'event', level: 'error' }]
+          ? [
+              { emit: 'event', level: 'warn' },
+              { emit: 'event', level: 'error' },
+            ]
           : [{ emit: 'event', level: 'error' }],
     });
   }
@@ -53,7 +59,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
    */
   async truncateAllTables(): Promise<void> {
     if (process.env.NODE_ENV !== 'test') {
-      throw new Error('truncateAllTables() is only available when NODE_ENV=test');
+      throw new Error(
+        'truncateAllTables() is only available when NODE_ENV=test',
+      );
     }
 
     await this.$executeRawUnsafe(`

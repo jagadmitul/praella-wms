@@ -20,7 +20,9 @@ import { REDIS_CLIENT } from './redis.constants';
         const logger = new Logger('RedisClient');
 
         if (!configService.get<boolean>('REDIS_ENABLED')) {
-          logger.warn('REDIS_ENABLED=false — caching and background queues are disabled');
+          logger.warn(
+            'REDIS_ENABLED=false — caching and background queues are disabled',
+          );
           return null;
         }
 

@@ -4,10 +4,7 @@ import type { Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheService } from '../cache/cache.service';
 import { StockLedgerService } from '../stock/stock-ledger.service';
-import {
-  BULK_STOCK_QUEUE,
-  type BulkStockJobPayload,
-} from './jobs.constants';
+import { BULK_STOCK_QUEUE, type BulkStockJobPayload } from './jobs.constants';
 
 /** One failed line, reported back on the job record. */
 interface LineError {
@@ -66,7 +63,10 @@ export class BulkStockProcessor extends WorkerHost {
     // Resolve SKUs and warehouse codes to ids once, rather than per line.
     const [products, warehouses] = await Promise.all([
       this.prisma.product.findMany({
-        where: { organizationId, sku: { in: [...new Set(lines.map((l) => l.sku))] } },
+        where: {
+          organizationId,
+          sku: { in: [...new Set(lines.map((l) => l.sku))] },
+        },
         select: { id: true, sku: true },
       }),
       this.prisma.warehouse.findMany({
@@ -86,13 +86,18 @@ export class BulkStockProcessor extends WorkerHost {
 
       for (const [index, line] of chunk.entries()) {
         const lineNumber = offset + index + 1;
-        const productId = productBySku.get(line.sku.toUpperCase()) ?? productBySku.get(line.sku);
+        const productId =
+          productBySku.get(line.sku.toUpperCase()) ??
+          productBySku.get(line.sku);
         const warehouseId =
           warehouseByCode.get(line.warehouseCode.toUpperCase()) ??
           warehouseByCode.get(line.warehouseCode);
 
         if (!productId) {
-          errors.push({ line: lineNumber, message: `Unknown SKU "${line.sku}"` });
+          errors.push({
+            line: lineNumber,
+            message: `Unknown SKU "${line.sku}"`,
+          });
           continue;
         }
 

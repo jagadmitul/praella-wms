@@ -9,4 +9,6 @@ import {
 export class CreateWarehouseDto extends createZodDto(createWarehouseSchema) {}
 export class UpdateWarehouseDto extends createZodDto(updateWarehouseSchema) {}
 export class WarehouseQueryDto extends createZodDto(warehouseQuerySchema) {}
-export class AssignWarehouseMembersDto extends createZodDto(assignWarehouseMembersSchema) {}
+export class AssignWarehouseMembersDto extends createZodDto(
+  assignWarehouseMembersSchema,
+) {}

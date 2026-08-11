@@ -1,5 +1,10 @@
 import type { INestApplication } from '@nestjs/common';
-import { api, createTestApp, seedFixture, type Fixture } from './setup/test-app';
+import {
+  api,
+  createTestApp,
+  seedFixture,
+  type Fixture,
+} from './setup/test-app';
 
 describe('Warehouses, catalogue & replenishment (e2e)', () => {
   let app: INestApplication;
@@ -18,10 +23,14 @@ describe('Warehouses, catalogue & replenishment (e2e)', () => {
   });
 
   const as = (token: string) => ({
-    get: (path: string) => api(app).get(path).set('Authorization', `Bearer ${token}`),
-    post: (path: string) => api(app).post(path).set('Authorization', `Bearer ${token}`),
-    patch: (path: string) => api(app).patch(path).set('Authorization', `Bearer ${token}`),
-    put: (path: string) => api(app).put(path).set('Authorization', `Bearer ${token}`),
+    get: (path: string) =>
+      api(app).get(path).set('Authorization', `Bearer ${token}`),
+    post: (path: string) =>
+      api(app).post(path).set('Authorization', `Bearer ${token}`),
+    patch: (path: string) =>
+      api(app).patch(path).set('Authorization', `Bearer ${token}`),
+    put: (path: string) =>
+      api(app).put(path).set('Authorization', `Bearer ${token}`),
     delete: (path: string) =>
       api(app).delete(path).set('Authorization', `Bearer ${token}`),
   });

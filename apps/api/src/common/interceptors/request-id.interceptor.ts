@@ -39,7 +39,8 @@ export class RequestIdInterceptor implements NestInterceptor {
 
     const incoming = request.headers['x-request-id'];
     const requestId =
-      (Array.isArray(incoming) ? incoming[0] : incoming)?.trim() || randomUUID();
+      (Array.isArray(incoming) ? incoming[0] : incoming)?.trim() ||
+      randomUUID();
 
     request.requestId = requestId;
     response.setHeader('x-request-id', requestId);
@@ -71,7 +72,8 @@ export class RequestIdInterceptor implements NestInterceptor {
     response: Response,
     startedAt: bigint,
   ): void {
-    const durationSeconds = Number(process.hrtime.bigint() - startedAt) / 1_000_000_000;
+    const durationSeconds =
+      Number(process.hrtime.bigint() - startedAt) / 1_000_000_000;
     const path = request.originalUrl ?? request.url;
 
     // `route.path` is the template (`/products/:id`); `originalUrl` is not.
@@ -104,7 +106,7 @@ export class RequestIdInterceptor implements NestInterceptor {
  */
 function stripIds(path: string): string {
   return path
-    .split('?')[0]!
+    .split('?')[0]
     .replace(/\/[0-9a-z]{20,}/gi, '/:id')
     .replace(/\/\d+/g, '/:id');
 }

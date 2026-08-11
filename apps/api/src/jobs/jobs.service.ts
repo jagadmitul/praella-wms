@@ -1,9 +1,12 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type { Queue } from 'bullmq';
 import type {
-  BulkJobStatus,
-  BulkJobType,
   BulkJobView,
   CreateBulkStockJobInput,
   Paginated,
@@ -107,7 +110,11 @@ export class JobsService {
       this.prisma.bulkJob.count({ where }),
     ]);
 
-    return paginate(rows.map(JobsService.toView), totalItems, query);
+    return paginate(
+      rows.map((row) => JobsService.toView(row)),
+      totalItems,
+      query,
+    );
   }
 
   /**
@@ -132,8 +139,8 @@ export class JobsService {
   private static toView(job: BulkJob): BulkJobView {
     return {
       id: job.id,
-      type: job.type as BulkJobType,
-      status: job.status as BulkJobStatus,
+      type: job.type,
+      status: job.status,
       totalLines: job.totalLines,
       processedLines: job.processedLines,
       failedLines: job.failedLines,

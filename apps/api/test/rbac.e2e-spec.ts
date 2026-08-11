@@ -1,5 +1,10 @@
 import type { INestApplication } from '@nestjs/common';
-import { api, createTestApp, seedFixture, type Fixture } from './setup/test-app';
+import {
+  api,
+  createTestApp,
+  seedFixture,
+  type Fixture,
+} from './setup/test-app';
 
 /**
  * Role-based access control and multi-tenancy.
@@ -25,9 +30,12 @@ describe('RBAC & tenant isolation (e2e)', () => {
   });
 
   const as = (token: string) => ({
-    get: (path: string) => api(app).get(path).set('Authorization', `Bearer ${token}`),
-    post: (path: string) => api(app).post(path).set('Authorization', `Bearer ${token}`),
-    patch: (path: string) => api(app).patch(path).set('Authorization', `Bearer ${token}`),
+    get: (path: string) =>
+      api(app).get(path).set('Authorization', `Bearer ${token}`),
+    post: (path: string) =>
+      api(app).post(path).set('Authorization', `Bearer ${token}`),
+    patch: (path: string) =>
+      api(app).patch(path).set('Authorization', `Bearer ${token}`),
     delete: (path: string) =>
       api(app).delete(path).set('Authorization', `Bearer ${token}`),
   });
@@ -90,10 +98,14 @@ describe('RBAC & tenant isolation (e2e)', () => {
       ['create a transfer', 'post', '/api/v1/transfers'],
       ['invite a member', 'post', '/api/v1/organization/members'],
     ])('denies STAFF the ability to %s', async (_label, method, path) => {
-      const response = await (as(fixture.staff.token) as never as Record<
-        string,
-        (p: string) => { send: (b: unknown) => Promise<{ status: number }> }
-      >)[method](path).send({});
+      const response = await (
+        as(fixture.staff.token) as never as Record<
+          string,
+          (p: string) => { send: (b: unknown) => Promise<{ status: number }> }
+        >
+      )
+        [method](path)
+        .send({});
 
       expect(response.status).toBe(403);
     });
@@ -134,8 +146,12 @@ describe('RBAC & tenant isolation (e2e)', () => {
 
   describe('warehouse scoping for STAFF', () => {
     it('shows a scoped member only their assigned warehouses', async () => {
-      const all = await as(fixture.admin.token).get('/api/v1/warehouses').expect(200);
-      const scoped = await as(fixture.staff.token).get('/api/v1/warehouses').expect(200);
+      const all = await as(fixture.admin.token)
+        .get('/api/v1/warehouses')
+        .expect(200);
+      const scoped = await as(fixture.staff.token)
+        .get('/api/v1/warehouses')
+        .expect(200);
 
       expect(all.body.meta.totalItems).toBe(2);
       expect(scoped.body.meta.totalItems).toBe(1);
@@ -161,7 +177,9 @@ describe('RBAC & tenant isolation (e2e)', () => {
     });
 
     it('reports the scope on /auth/me so the UI can match the API', async () => {
-      const response = await as(fixture.staff.token).get('/api/v1/auth/me').expect(200);
+      const response = await as(fixture.staff.token)
+        .get('/api/v1/auth/me')
+        .expect(200);
 
       expect(response.body.activeRole).toBe('STAFF');
       expect(response.body.warehouseScope).toEqual([fixture.warehouseA]);
@@ -171,7 +189,9 @@ describe('RBAC & tenant isolation (e2e)', () => {
 
     it('leaves ADMIN and MANAGER unscoped', async () => {
       for (const actor of [fixture.admin, fixture.manager]) {
-        const response = await as(actor.token).get('/api/v1/auth/me').expect(200);
+        const response = await as(actor.token)
+          .get('/api/v1/auth/me')
+          .expect(200);
         expect(response.body.warehouseScope).toBeNull();
       }
     });

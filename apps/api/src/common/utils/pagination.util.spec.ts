@@ -4,8 +4,14 @@ import { buildOrderBy, paginate, toPrismaPage } from './pagination.util';
 describe('pagination helpers', () => {
   describe('toPrismaPage', () => {
     it('converts a 1-based page into skip/take', () => {
-      expect(toPrismaPage({ page: 1, pageSize: 20 })).toEqual({ skip: 0, take: 20 });
-      expect(toPrismaPage({ page: 3, pageSize: 25 })).toEqual({ skip: 50, take: 25 });
+      expect(toPrismaPage({ page: 1, pageSize: 20 })).toEqual({
+        skip: 0,
+        take: 20,
+      });
+      expect(toPrismaPage({ page: 3, pageSize: 25 })).toEqual({
+        skip: 50,
+        take: 25,
+      });
     });
   });
 
@@ -41,11 +47,15 @@ describe('pagination helpers', () => {
     const allowed = ['name', 'sku', 'createdAt'] as const;
 
     it('honours an allowed sort field', () => {
-      expect(buildOrderBy('sku', 'asc', allowed, 'name')).toEqual({ sku: 'asc' });
+      expect(buildOrderBy('sku', 'asc', allowed, 'name')).toEqual({
+        sku: 'asc',
+      });
     });
 
     it('falls back when the field is absent', () => {
-      expect(buildOrderBy(undefined, 'desc', allowed, 'name')).toEqual({ name: 'desc' });
+      expect(buildOrderBy(undefined, 'desc', allowed, 'name')).toEqual({
+        name: 'desc',
+      });
     });
 
     it('refuses a field outside the allow-list', () => {

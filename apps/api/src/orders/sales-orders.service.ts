@@ -20,7 +20,11 @@ import { AuditService } from '../common/services/audit.service';
 import { DocumentCounterService } from '../common/services/document-counter.service';
 import { paginate, toPrismaPage } from '../common/utils/pagination.util';
 import { assertVersion } from '../common/utils/concurrency.util';
-import { multiplyMoney, sumMoney, toMoneyString } from '../common/utils/decimal.util';
+import {
+  multiplyMoney,
+  sumMoney,
+  toMoneyString,
+} from '../common/utils/decimal.util';
 import {
   assertWarehouseAccess,
   warehouseScopeFilter,
@@ -33,12 +37,16 @@ const SO_INCLUDE = {
   warehouse: { select: { id: true, name: true, code: true } },
   createdBy: { select: { id: true, fullName: true } },
   items: {
-    include: { product: { select: { id: true, name: true, sku: true, unit: true } } },
+    include: {
+      product: { select: { id: true, name: true, sku: true, unit: true } },
+    },
     orderBy: { id: 'asc' },
   },
 } satisfies Prisma.SalesOrderInclude;
 
-type SalesOrderRow = Prisma.SalesOrderGetPayload<{ include: typeof SO_INCLUDE }>;
+type SalesOrderRow = Prisma.SalesOrderGetPayload<{
+  include: typeof SO_INCLUDE;
+}>;
 
 const FULFILLABLE_STATUSES: readonly SalesOrderStatus[] = [
   'ALLOCATED',
@@ -97,7 +105,9 @@ export class SalesOrdersService {
             OR: [
               { code: { contains: query.search, mode: 'insensitive' } },
               { customerName: { contains: query.search, mode: 'insensitive' } },
-              { customerEmail: { contains: query.search, mode: 'insensitive' } },
+              {
+                customerEmail: { contains: query.search, mode: 'insensitive' },
+              },
             ],
           }
         : {}),
@@ -113,7 +123,11 @@ export class SalesOrdersService {
       this.prisma.salesOrder.count({ where }),
     ]);
 
-    return paginate(rows.map(SalesOrdersService.toView), totalItems, query);
+    return paginate(
+      rows.map((row) => SalesOrdersService.toView(row)),
+      totalItems,
+      query,
+    );
   }
 
   /**
@@ -148,7 +162,11 @@ export class SalesOrdersService {
     );
 
     const order = await this.prisma.$transaction(async (tx) => {
-      const code = await this.counters.next(tx, orgContext.organizationId, 'SO');
+      const code = await this.counters.next(
+        tx,
+        orgContext.organizationId,
+        'SO',
+      );
 
       return tx.salesOrder.create({
         data: {
@@ -173,10 +191,16 @@ export class SalesOrdersService {
       });
     });
 
-    await this.afterMutation(orgContext, actorId, 'sales_order.created', order.id, {
-      code: order.code,
-      totalAmount,
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'sales_order.created',
+      order.id,
+      {
+        code: order.code,
+        totalAmount,
+      },
+    );
 
     return SalesOrdersService.toView(order);
   }
@@ -197,16 +221,15 @@ export class SalesOrdersService {
     input: UpdateSalesOrderInput,
   ): Promise<SalesOrderView> {
     const order = await this.load(orgContext, id);
-    SalesOrdersService.assertStatus(order.status as SalesOrderStatus, [
-      'DRAFT',
-      'ALLOCATED',
-    ]);
+    SalesOrdersService.assertStatus(order.status, ['DRAFT', 'ALLOCATED']);
     assertVersion('sales order', order.version, input.expectedVersion);
 
     const updated = await this.prisma.salesOrder.update({
       where: { id },
       data: {
-        ...(input.customerName === undefined ? {} : { customerName: input.customerName }),
+        ...(input.customerName === undefined
+          ? {}
+          : { customerName: input.customerName }),
         ...(input.notes === undefined ? {} : { notes: input.notes }),
         version: { increment: 1 },
       },
@@ -240,7 +263,7 @@ export class SalesOrdersService {
     input: ReplaceSalesOrderLinesInput,
   ): Promise<SalesOrderView> {
     const order = await this.load(orgContext, id);
-    SalesOrdersService.assertStatus(order.status as SalesOrderStatus, ['DRAFT']);
+    SalesOrdersService.assertStatus(order.status, ['DRAFT']);
     assertVersion('sales order', order.version, input.expectedVersion);
 
     const productCount = await this.prisma.product.count({
@@ -251,7 +274,9 @@ export class SalesOrdersService {
     });
 
     if (productCount !== input.items.length) {
-      throw new BadRequestException('One or more products do not exist in this organisation');
+      throw new BadRequestException(
+        'One or more products do not exist in this organisation',
+      );
     }
 
     const totalAmount = sumMoney(
@@ -278,11 +303,17 @@ export class SalesOrdersService {
       });
     });
 
-    await this.afterMutation(orgContext, actorId, 'sales_order.lines_replaced', id, {
-      code: order.code,
-      lines: input.items.length,
-      totalAmount,
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'sales_order.lines_replaced',
+      id,
+      {
+        code: order.code,
+        lines: input.items.length,
+        totalAmount,
+      },
+    );
 
     return SalesOrdersService.toView(updated);
   }
@@ -302,7 +333,7 @@ export class SalesOrdersService {
     id: string,
   ): Promise<SalesOrderView> {
     const order = await this.load(orgContext, id);
-    SalesOrdersService.assertStatus(order.status as SalesOrderStatus, ['DRAFT']);
+    SalesOrdersService.assertStatus(order.status, ['DRAFT']);
     assertWarehouseAccess(orgContext, order.warehouseId);
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -348,10 +379,7 @@ export class SalesOrdersService {
     input: FulfillSalesOrderInput,
   ): Promise<SalesOrderView> {
     const order = await this.load(orgContext, id);
-    SalesOrdersService.assertStatus(
-      order.status as SalesOrderStatus,
-      FULFILLABLE_STATUSES,
-    );
+    SalesOrdersService.assertStatus(order.status, FULFILLABLE_STATUSES);
     assertWarehouseAccess(orgContext, order.warehouseId);
 
     const shipments = SalesOrdersService.resolveShipments(order, input);
@@ -429,7 +457,7 @@ export class SalesOrdersService {
     id: string,
   ): Promise<SalesOrderView> {
     const order = await this.load(orgContext, id);
-    SalesOrdersService.assertStatus(order.status as SalesOrderStatus, [
+    SalesOrdersService.assertStatus(order.status, [
       'DRAFT',
       'ALLOCATED',
       'PARTIALLY_FULFILLED',
@@ -506,7 +534,10 @@ export class SalesOrdersService {
     });
   }
 
-  private async load(orgContext: OrgContext, id: string): Promise<SalesOrderRow> {
+  private async load(
+    orgContext: OrgContext,
+    id: string,
+  ): Promise<SalesOrderRow> {
     const order = await this.prisma.salesOrder.findFirst({
       where: { id, organizationId: orgContext.organizationId },
       include: SO_INCLUDE,
@@ -536,7 +567,10 @@ export class SalesOrdersService {
   ): Promise<void> {
     const [warehouse, productCount] = await Promise.all([
       this.prisma.warehouse.findFirst({
-        where: { id: input.warehouseId, organizationId: orgContext.organizationId },
+        where: {
+          id: input.warehouseId,
+          organizationId: orgContext.organizationId,
+        },
         select: { id: true },
       }),
       this.prisma.product.count({
@@ -548,10 +582,16 @@ export class SalesOrdersService {
     ]);
 
     if (!warehouse) {
-      throw new BadRequestException('Warehouse does not exist in this organisation');
+      throw new BadRequestException(
+        'Warehouse does not exist in this organisation',
+      );
     }
-    if (productCount !== new Set(input.items.map((item) => item.productId)).size) {
-      throw new BadRequestException('One or more products do not exist in this organisation');
+    if (
+      productCount !== new Set(input.items.map((item) => item.productId)).size
+    ) {
+      throw new BadRequestException(
+        'One or more products do not exist in this organisation',
+      );
     }
   }
 
@@ -580,7 +620,7 @@ export class SalesOrdersService {
       id: order.id,
       code: order.code,
       version: order.version,
-      status: order.status as SalesOrderStatus,
+      status: order.status,
       notes: order.notes,
       totalAmount: toMoneyString(order.totalAmount),
       customerName: order.customerName,

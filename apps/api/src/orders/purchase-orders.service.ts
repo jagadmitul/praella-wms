@@ -20,7 +20,11 @@ import { AuditService } from '../common/services/audit.service';
 import { DocumentCounterService } from '../common/services/document-counter.service';
 import { paginate, toPrismaPage } from '../common/utils/pagination.util';
 import { assertVersion } from '../common/utils/concurrency.util';
-import { multiplyMoney, sumMoney, toMoneyString } from '../common/utils/decimal.util';
+import {
+  multiplyMoney,
+  sumMoney,
+  toMoneyString,
+} from '../common/utils/decimal.util';
 import {
   assertWarehouseAccess,
   warehouseScopeFilter,
@@ -34,12 +38,16 @@ const PO_INCLUDE = {
   warehouse: { select: { id: true, name: true, code: true } },
   createdBy: { select: { id: true, fullName: true } },
   items: {
-    include: { product: { select: { id: true, name: true, sku: true, unit: true } } },
+    include: {
+      product: { select: { id: true, name: true, sku: true, unit: true } },
+    },
     orderBy: { id: 'asc' },
   },
 } satisfies Prisma.PurchaseOrderInclude;
 
-type PurchaseOrderRow = Prisma.PurchaseOrderGetPayload<{ include: typeof PO_INCLUDE }>;
+type PurchaseOrderRow = Prisma.PurchaseOrderGetPayload<{
+  include: typeof PO_INCLUDE;
+}>;
 
 /** Statuses from which a purchase order may still be received against. */
 const RECEIVABLE_STATUSES: readonly PurchaseOrderStatus[] = [
@@ -95,7 +103,11 @@ export class PurchaseOrdersService {
         ? {
             OR: [
               { code: { contains: query.search, mode: 'insensitive' } },
-              { supplier: { name: { contains: query.search, mode: 'insensitive' } } },
+              {
+                supplier: {
+                  name: { contains: query.search, mode: 'insensitive' },
+                },
+              },
             ],
           }
         : {}),
@@ -111,7 +123,11 @@ export class PurchaseOrdersService {
       this.prisma.purchaseOrder.count({ where }),
     ]);
 
-    return paginate(rows.map(PurchaseOrdersService.toView), totalItems, query);
+    return paginate(
+      rows.map((row) => PurchaseOrdersService.toView(row)),
+      totalItems,
+      query,
+    );
   }
 
   /**
@@ -121,7 +137,10 @@ export class PurchaseOrdersService {
    * @param id - Purchase order identifier.
    * @returns The purchase order.
    */
-  async findOne(orgContext: OrgContext, id: string): Promise<PurchaseOrderView> {
+  async findOne(
+    orgContext: OrgContext,
+    id: string,
+  ): Promise<PurchaseOrderView> {
     return PurchaseOrdersService.toView(await this.load(orgContext, id));
   }
 
@@ -146,7 +165,11 @@ export class PurchaseOrdersService {
     );
 
     const order = await this.prisma.$transaction(async (tx) => {
-      const code = await this.counters.next(tx, orgContext.organizationId, 'PO');
+      const code = await this.counters.next(
+        tx,
+        orgContext.organizationId,
+        'PO',
+      );
 
       return tx.purchaseOrder.create({
         data: {
@@ -171,10 +194,16 @@ export class PurchaseOrdersService {
       });
     });
 
-    await this.afterMutation(orgContext, actorId, 'purchase_order.created', order.id, {
-      code: order.code,
-      totalAmount,
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'purchase_order.created',
+      order.id,
+      {
+        code: order.code,
+        totalAmount,
+      },
+    );
 
     return PurchaseOrdersService.toView(order);
   }
@@ -195,10 +224,7 @@ export class PurchaseOrdersService {
     input: UpdatePurchaseOrderInput,
   ): Promise<PurchaseOrderView> {
     const order = await this.load(orgContext, id);
-    PurchaseOrdersService.assertStatus(order.status as PurchaseOrderStatus, [
-      'DRAFT',
-      'SUBMITTED',
-    ]);
+    PurchaseOrdersService.assertStatus(order.status, ['DRAFT', 'SUBMITTED']);
     assertVersion('purchase order', order.version, input.expectedVersion);
 
     const updated = await this.prisma.purchaseOrder.update({
@@ -213,9 +239,15 @@ export class PurchaseOrdersService {
       include: PO_INCLUDE,
     });
 
-    await this.afterMutation(orgContext, actorId, 'purchase_order.updated', id, {
-      code: order.code,
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'purchase_order.updated',
+      id,
+      {
+        code: order.code,
+      },
+    );
 
     return PurchaseOrdersService.toView(updated);
   }
@@ -240,7 +272,7 @@ export class PurchaseOrdersService {
     input: ReplacePurchaseOrderLinesInput,
   ): Promise<PurchaseOrderView> {
     const order = await this.load(orgContext, id);
-    PurchaseOrdersService.assertStatus(order.status as PurchaseOrderStatus, ['DRAFT']);
+    PurchaseOrdersService.assertStatus(order.status, ['DRAFT']);
     assertVersion('purchase order', order.version, input.expectedVersion);
 
     const productCount = await this.prisma.product.count({
@@ -251,7 +283,9 @@ export class PurchaseOrdersService {
     });
 
     if (productCount !== input.items.length) {
-      throw new BadRequestException('One or more products do not exist in this organisation');
+      throw new BadRequestException(
+        'One or more products do not exist in this organisation',
+      );
     }
 
     const totalAmount = sumMoney(
@@ -281,11 +315,17 @@ export class PurchaseOrdersService {
       });
     });
 
-    await this.afterMutation(orgContext, actorId, 'purchase_order.lines_replaced', id, {
-      code: order.code,
-      lines: input.items.length,
-      totalAmount,
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'purchase_order.lines_replaced',
+      id,
+      {
+        code: order.code,
+        lines: input.items.length,
+        totalAmount,
+      },
+    );
 
     return PurchaseOrdersService.toView(updated);
   }
@@ -304,7 +344,7 @@ export class PurchaseOrdersService {
     id: string,
   ): Promise<PurchaseOrderView> {
     const order = await this.load(orgContext, id);
-    PurchaseOrdersService.assertStatus(order.status as PurchaseOrderStatus, ['DRAFT']);
+    PurchaseOrdersService.assertStatus(order.status, ['DRAFT']);
 
     const updated = await this.prisma.purchaseOrder.update({
       where: { id },
@@ -312,9 +352,15 @@ export class PurchaseOrdersService {
       include: PO_INCLUDE,
     });
 
-    await this.afterMutation(orgContext, actorId, 'purchase_order.submitted', id, {
-      code: order.code,
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'purchase_order.submitted',
+      id,
+      {
+        code: order.code,
+      },
+    );
 
     return PurchaseOrdersService.toView(updated);
   }
@@ -339,10 +385,7 @@ export class PurchaseOrdersService {
     input: ReceivePurchaseOrderInput,
   ): Promise<PurchaseOrderView> {
     const order = await this.load(orgContext, id);
-    PurchaseOrdersService.assertStatus(
-      order.status as PurchaseOrderStatus,
-      RECEIVABLE_STATUSES,
-    );
+    PurchaseOrdersService.assertStatus(order.status, RECEIVABLE_STATUSES);
     assertWarehouseAccess(orgContext, order.warehouseId);
 
     const receipts = PurchaseOrdersService.resolveReceipts(order, input);
@@ -393,12 +436,18 @@ export class PurchaseOrdersService {
       });
     });
 
-    await this.afterMutation(orgContext, actorId, 'purchase_order.received', id, {
-      code: order.code,
-      lines: receipts.length,
-      units: receipts.reduce((sum, receipt) => sum + receipt.quantity, 0),
-      status: updated.status,
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'purchase_order.received',
+      id,
+      {
+        code: order.code,
+        lines: receipts.length,
+        units: receipts.reduce((sum, receipt) => sum + receipt.quantity, 0),
+        status: updated.status,
+      },
+    );
 
     return PurchaseOrdersService.toView(updated);
   }
@@ -417,10 +466,7 @@ export class PurchaseOrdersService {
     id: string,
   ): Promise<PurchaseOrderView> {
     const order = await this.load(orgContext, id);
-    PurchaseOrdersService.assertStatus(order.status as PurchaseOrderStatus, [
-      'DRAFT',
-      'SUBMITTED',
-    ]);
+    PurchaseOrdersService.assertStatus(order.status, ['DRAFT', 'SUBMITTED']);
 
     if (order.items.some((item) => item.receivedQuantity > 0)) {
       throw new ConflictException(
@@ -434,9 +480,15 @@ export class PurchaseOrdersService {
       include: PO_INCLUDE,
     });
 
-    await this.afterMutation(orgContext, actorId, 'purchase_order.cancelled', id, {
-      code: order.code,
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'purchase_order.cancelled',
+      id,
+      {
+        code: order.code,
+      },
+    );
 
     return PurchaseOrdersService.toView(updated);
   }
@@ -448,7 +500,12 @@ export class PurchaseOrdersService {
   private static resolveReceipts(
     order: PurchaseOrderRow,
     input: ReceivePurchaseOrderInput,
-  ): Array<{ itemId: string; productId: string; quantity: number; unitCost: string }> {
+  ): Array<{
+    itemId: string;
+    productId: string;
+    quantity: number;
+    unitCost: string;
+  }> {
     if (!input.items || input.items.length === 0) {
       return order.items
         .filter((item) => item.receivedQuantity < item.quantity)
@@ -487,7 +544,10 @@ export class PurchaseOrdersService {
     });
   }
 
-  private async load(orgContext: OrgContext, id: string): Promise<PurchaseOrderRow> {
+  private async load(
+    orgContext: OrgContext,
+    id: string,
+  ): Promise<PurchaseOrderRow> {
     const order = await this.prisma.purchaseOrder.findFirst({
       where: { id, organizationId: orgContext.organizationId },
       include: PO_INCLUDE,
@@ -517,11 +577,17 @@ export class PurchaseOrdersService {
   ): Promise<void> {
     const [supplier, warehouse, productCount] = await Promise.all([
       this.prisma.supplier.findFirst({
-        where: { id: input.supplierId, organizationId: orgContext.organizationId },
+        where: {
+          id: input.supplierId,
+          organizationId: orgContext.organizationId,
+        },
         select: { id: true },
       }),
       this.prisma.warehouse.findFirst({
-        where: { id: input.warehouseId, organizationId: orgContext.organizationId },
+        where: {
+          id: input.warehouseId,
+          organizationId: orgContext.organizationId,
+        },
         select: { id: true },
       }),
       this.prisma.product.count({
@@ -533,13 +599,21 @@ export class PurchaseOrdersService {
     ]);
 
     if (!supplier) {
-      throw new BadRequestException('Supplier does not exist in this organisation');
+      throw new BadRequestException(
+        'Supplier does not exist in this organisation',
+      );
     }
     if (!warehouse) {
-      throw new BadRequestException('Warehouse does not exist in this organisation');
+      throw new BadRequestException(
+        'Warehouse does not exist in this organisation',
+      );
     }
-    if (productCount !== new Set(input.items.map((item) => item.productId)).size) {
-      throw new BadRequestException('One or more products do not exist in this organisation');
+    if (
+      productCount !== new Set(input.items.map((item) => item.productId)).size
+    ) {
+      throw new BadRequestException(
+        'One or more products do not exist in this organisation',
+      );
     }
   }
 
@@ -568,7 +642,7 @@ export class PurchaseOrdersService {
       id: order.id,
       code: order.code,
       version: order.version,
-      status: order.status as PurchaseOrderStatus,
+      status: order.status,
       notes: order.notes,
       totalAmount: toMoneyString(order.totalAmount),
       expectedAt: order.expectedAt?.toISOString() ?? null,

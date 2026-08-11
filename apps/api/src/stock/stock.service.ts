@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type {
   AdjustStockInput,
   LowStockItemView,
@@ -13,7 +17,11 @@ import type {
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheService } from '../cache/cache.service';
 import { AuditService } from '../common/services/audit.service';
-import { buildOrderBy, paginate, toPrismaPage } from '../common/utils/pagination.util';
+import {
+  buildOrderBy,
+  paginate,
+  toPrismaPage,
+} from '../common/utils/pagination.util';
 import {
   assertWarehouseAccess,
   warehouseScopeFilter,
@@ -28,7 +36,11 @@ import {
   toStockLevelView,
 } from './stock.mapper';
 
-const LEVEL_SORTABLE_FIELDS = ['quantity', 'updatedAt', 'reorderPoint'] as const;
+const LEVEL_SORTABLE_FIELDS = [
+  'quantity',
+  'updatedAt',
+  'reorderPoint',
+] as const;
 
 /**
  * Filter matching stock levels at or below their replenishment threshold.
@@ -111,7 +123,11 @@ export class StockService {
       organizationId: orgContext.organizationId,
       ...(query.productId ? { productId: query.productId } : {}),
       ...(query.type ? { type: query.type } : {}),
-      ...(query.warehouseId ? { warehouseId: query.warehouseId } : scope ? { warehouseId: scope } : {}),
+      ...(query.warehouseId
+        ? { warehouseId: query.warehouseId }
+        : scope
+          ? { warehouseId: scope }
+          : {}),
       ...(query.from || query.to
         ? {
             createdAt: {
@@ -123,9 +139,19 @@ export class StockService {
       ...(query.search
         ? {
             OR: [
-              { product: { name: { contains: query.search, mode: 'insensitive' } } },
-              { product: { sku: { contains: query.search, mode: 'insensitive' } } },
-              { referenceCode: { contains: query.search, mode: 'insensitive' } },
+              {
+                product: {
+                  name: { contains: query.search, mode: 'insensitive' },
+                },
+              },
+              {
+                product: {
+                  sku: { contains: query.search, mode: 'insensitive' },
+                },
+              },
+              {
+                referenceCode: { contains: query.search, mode: 'insensitive' },
+              },
               { note: { contains: query.search, mode: 'insensitive' } },
             ],
           }
@@ -260,7 +286,9 @@ export class StockService {
     });
 
     if (!product) {
-      throw new BadRequestException('Product does not exist in this organisation');
+      throw new BadRequestException(
+        'Product does not exist in this organisation',
+      );
     }
 
     const level = await this.prisma.stockLevel.upsert({
@@ -326,7 +354,9 @@ export class StockService {
       orgContext.organizationId,
       'low-stock',
       warehouseId ?? 'all',
-      orgContext.warehouseScope ? orgContext.warehouseScope.join(',') : 'unscoped',
+      orgContext.warehouseScope
+        ? orgContext.warehouseScope.join(',')
+        : 'unscoped',
     );
 
     return this.cacheService.remember(cacheKey, async () => {
@@ -336,7 +366,11 @@ export class StockService {
         where: {
           organizationId: orgContext.organizationId,
           ...belowThresholdFilter(this.prisma),
-          ...(warehouseId ? { warehouseId } : scope ? { warehouseId: scope } : {}),
+          ...(warehouseId
+            ? { warehouseId }
+            : scope
+              ? { warehouseId: scope }
+              : {}),
           product: { isActive: true },
         },
         include: {
@@ -392,7 +426,9 @@ export class StockService {
         : scope
           ? { warehouseId: scope }
           : {}),
-      ...(query.categoryId ? { product: { categoryId: query.categoryId } } : {}),
+      ...(query.categoryId
+        ? { product: { categoryId: query.categoryId } }
+        : {}),
       ...(query.belowThreshold ? belowThresholdFilter(this.prisma) : {}),
       ...(query.search
         ? {

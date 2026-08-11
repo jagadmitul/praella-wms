@@ -57,7 +57,9 @@ export class ReportsService {
         ? [...orgContext.warehouseScope]
         : null;
       const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1_000);
-      const trendSince = new Date(Date.now() - TREND_DAYS * 24 * 60 * 60 * 1_000);
+      const trendSince = new Date(
+        Date.now() - TREND_DAYS * 24 * 60 * 60 * 1_000,
+      );
 
       const [
         warehouseCount,
@@ -209,10 +211,16 @@ export class ReportsService {
     // Days with no movement must still appear, otherwise the chart silently
     // compresses quiet periods and misrepresents the trend.
     return Array.from({ length: TREND_DAYS }, (_unused, index) => {
-      const date = new Date(Date.now() - (TREND_DAYS - 1 - index) * 24 * 60 * 60 * 1_000);
+      const date = new Date(
+        Date.now() - (TREND_DAYS - 1 - index) * 24 * 60 * 60 * 1_000,
+      );
       const key = date.toISOString().slice(0, 10);
       const entry = byDate.get(key);
-      return { date: key, inbound: entry?.inbound ?? 0, outbound: entry?.outbound ?? 0 };
+      return {
+        date: key,
+        inbound: entry?.inbound ?? 0,
+        outbound: entry?.outbound ?? 0,
+      };
     });
   }
 }

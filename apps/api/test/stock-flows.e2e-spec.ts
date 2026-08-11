@@ -1,5 +1,10 @@
 import type { INestApplication } from '@nestjs/common';
-import { api, createTestApp, seedFixture, type Fixture } from './setup/test-app';
+import {
+  api,
+  createTestApp,
+  seedFixture,
+  type Fixture,
+} from './setup/test-app';
 
 describe('Stock movements, transfers & orders (e2e)', () => {
   let app: INestApplication;
@@ -18,18 +23,27 @@ describe('Stock movements, transfers & orders (e2e)', () => {
   });
 
   const as = (token: string) => ({
-    get: (path: string) => api(app).get(path).set('Authorization', `Bearer ${token}`),
-    post: (path: string) => api(app).post(path).set('Authorization', `Bearer ${token}`),
-    put: (path: string) => api(app).put(path).set('Authorization', `Bearer ${token}`),
+    get: (path: string) =>
+      api(app).get(path).set('Authorization', `Bearer ${token}`),
+    post: (path: string) =>
+      api(app).post(path).set('Authorization', `Bearer ${token}`),
+    put: (path: string) =>
+      api(app).put(path).set('Authorization', `Bearer ${token}`),
   });
 
   /** Reads the on-hand and reserved quantity for a (product, warehouse) pair. */
   async function level(
     warehouseId: string,
     productId = fixture.productId,
-  ): Promise<{ quantity: number; reservedQuantity: number; availableQuantity: number }> {
+  ): Promise<{
+    quantity: number;
+    reservedQuantity: number;
+    availableQuantity: number;
+  }> {
     const response = await as(fixture.manager.token)
-      .get(`/api/v1/stock/levels?productId=${productId}&warehouseId=${warehouseId}`)
+      .get(
+        `/api/v1/stock/levels?productId=${productId}&warehouseId=${warehouseId}`,
+      )
       .expect(200);
 
     return (
@@ -91,18 +105,18 @@ describe('Stock movements, transfers & orders (e2e)', () => {
       // Ten simultaneous requests for 100 units each against 500 on hand.
       // Row locking must let exactly five succeed.
       const attempts = Array.from({ length: 10 }, () =>
-        as(fixture.manager.token)
-          .post('/api/v1/stock/movements')
-          .send({
-            productId: fixture.productId,
-            warehouseId: fixture.warehouseA,
-            type: 'OUTBOUND',
-            quantity: 100,
-          }),
+        as(fixture.manager.token).post('/api/v1/stock/movements').send({
+          productId: fixture.productId,
+          warehouseId: fixture.warehouseA,
+          type: 'OUTBOUND',
+          quantity: 100,
+        }),
       );
 
       const results = await Promise.all(attempts);
-      const succeeded = results.filter((result) => result.status === 201).length;
+      const succeeded = results.filter(
+        (result) => result.status === 201,
+      ).length;
       const rejected = results.filter((result) => result.status === 409).length;
 
       expect(succeeded).toBe(5);
@@ -155,7 +169,9 @@ describe('Stock movements, transfers & orders (e2e)', () => {
         .expect(201);
 
       const movements = await as(fixture.manager.token)
-        .get(`/api/v1/stock/movements?warehouseId=${fixture.warehouseA}&pageSize=100`)
+        .get(
+          `/api/v1/stock/movements?warehouseId=${fixture.warehouseA}&pageSize=100`,
+        )
         .expect(200);
 
       const net = movements.body.items.reduce(
@@ -295,7 +311,9 @@ describe('Stock movements, transfers & orders (e2e)', () => {
       const partial = await as(fixture.manager.token)
         .post(`/api/v1/purchase-orders/${order.body.id}/receive`)
         .send({
-          items: [{ purchaseOrderItemId: order.body.items[0].id, quantity: 80 }],
+          items: [
+            { purchaseOrderItemId: order.body.items[0].id, quantity: 80 },
+          ],
         })
         .expect(201);
 
@@ -321,7 +339,9 @@ describe('Stock movements, transfers & orders (e2e)', () => {
       const response = await as(fixture.manager.token)
         .post(`/api/v1/purchase-orders/${order.body.id}/receive`)
         .send({
-          items: [{ purchaseOrderItemId: order.body.items[0].id, quantity: 500 }],
+          items: [
+            { purchaseOrderItemId: order.body.items[0].id, quantity: 500 },
+          ],
         })
         .expect(409);
 
@@ -354,7 +374,9 @@ describe('Stock movements, transfers & orders (e2e)', () => {
           warehouseId: fixture.warehouseA,
           customerName: 'Beta Retail',
           customerEmail: 'buyer@beta.example',
-          items: [{ productId: fixture.productId, quantity, unitPrice: 199.99 }],
+          items: [
+            { productId: fixture.productId, quantity, unitPrice: 199.99 },
+          ],
         })
         .expect(201);
     }
@@ -445,7 +467,9 @@ describe('Stock movements, transfers & orders (e2e)', () => {
 
       const partial = await as(fixture.manager.token)
         .post(`/api/v1/sales-orders/${order.body.id}/fulfill`)
-        .send({ items: [{ salesOrderItemId: order.body.items[0].id, quantity: 75 }] })
+        .send({
+          items: [{ salesOrderItemId: order.body.items[0].id, quantity: 75 }],
+        })
         .expect(201);
 
       expect(partial.body.status).toBe('PARTIALLY_FULFILLED');

@@ -30,9 +30,12 @@ process.env.REDIS_ENABLED = testPath.includes('bulk-jobs') ? 'true' : 'false';
 process.env.QUEUE_PREFIX = 'wms-test';
 
 process.env.THROTTLE_LIMIT = testPath.includes('rate-limit') ? '5' : '100000';
-process.env.AUTH_THROTTLE_LIMIT = testPath.includes('rate-limit') ? '5' : '100000';
+process.env.AUTH_THROTTLE_LIMIT = testPath.includes('rate-limit')
+  ? '5'
+  : '100000';
 
 process.env.JWT_ACCESS_SECRET =
   process.env.JWT_ACCESS_SECRET ?? 'test-access-secret-that-is-long-enough-32';
 process.env.JWT_REFRESH_SECRET =
-  process.env.JWT_REFRESH_SECRET ?? 'test-refresh-secret-that-is-long-enough-32';
+  process.env.JWT_REFRESH_SECRET ??
+  'test-refresh-secret-that-is-long-enough-32';

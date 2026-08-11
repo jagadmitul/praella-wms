@@ -32,11 +32,15 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<MaybeAuthenticatedRequest>();
+    const request = context
+      .switchToHttp()
+      .getRequest<MaybeAuthenticatedRequest>();
     const orgContext = request.orgContext;
 
     if (!orgContext) {
-      throw new ForbiddenException('No organisation context resolved for this request');
+      throw new ForbiddenException(
+        'No organisation context resolved for this request',
+      );
     }
 
     const missing = required.filter(

@@ -10,13 +10,26 @@ import {
 import {
   ApiBody,
   ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import {
+  ApiErrorResponse,
+  AuthSessionResponse,
+  AuthTokensResponse,
+  CurrentSessionResponse,
+} from '../common/dto/response.dto';
 import { Throttle } from '@nestjs/throttler';
 import type { AuthSession, AuthTokens, CurrentSession } from '@wms/contracts';
-import { CurrentUser, Public, SkipOrgContext } from '../common/decorators';
+import {
+  ApiErrors,
+  CurrentUser,
+  Public,
+  SkipOrgContext,
+} from '../common/decorators';
 import type {
   MaybeAuthenticatedRequest,
   RequestUser,
@@ -31,8 +44,12 @@ import {
 } from '@wms/contracts';
 import { PasswordResetService } from './password-reset.service';
 
-class RequestPasswordResetDto extends createZodDto(requestPasswordResetSchema) {}
-class ConfirmPasswordResetDto extends createZodDto(confirmPasswordResetSchema) {}
+class RequestPasswordResetDto extends createZodDto(
+  requestPasswordResetSchema,
+) {}
+class ConfirmPasswordResetDto extends createZodDto(
+  confirmPasswordResetSchema,
+) {}
 
 /**
  * Sign-up and sign-in are far tighter than the global limit — they are the
@@ -59,11 +76,13 @@ export class AuthController {
   @Public()
   @Throttle(AUTH_THROTTLE)
   @Post('sign-up')
+  @ApiErrors('validation', 'badRequest', 'conflict')
   @ApiOperation({
     summary: 'Register a user and create their organisation',
     description:
       'Creates the user, an organisation, and an ADMIN membership linking them, then returns a token pair.',
   })
+  @ApiCreatedResponse({ type: AuthSessionResponse })
   @ApiBody({ type: SignUpDto })
   @ApiCreatedResponse({ description: 'Account created and signed in' })
   async signUp(
@@ -76,8 +95,10 @@ export class AuthController {
   @Public()
   @Throttle(AUTH_THROTTLE)
   @Post('sign-in')
+  @ApiErrors('validation', 'badRequest', 'conflict')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Sign in with email and password' })
+  @ApiOkResponse({ type: AuthSessionResponse })
   @ApiBody({ type: SignInDto })
   @ApiOkResponse({ description: 'Signed in' })
   async signIn(
@@ -89,24 +110,31 @@ export class AuthController {
 
   @Public()
   @Post('refresh')
+  @ApiErrors('validation', 'badRequest', 'conflict')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Exchange a refresh token for a new token pair',
     description:
       'Rotates the refresh token. Presenting an already-rotated token revokes every session for that user.',
   })
+  @ApiOkResponse({ type: AuthTokensResponse })
   @ApiBody({ type: RefreshTokenDto })
   @ApiOkResponse({ description: 'New token pair issued' })
   async refresh(
     @Body() body: RefreshTokenDto,
     @Req() request: MaybeAuthenticatedRequest,
   ): Promise<AuthTokens> {
-    return this.tokenService.rotate(body.refreshToken, AuthController.clientInfo(request));
+    return this.tokenService.rotate(
+      body.refreshToken,
+      AuthController.clientInfo(request),
+    );
   }
 
   @Public()
   @Post('sign-out')
+  @ApiErrors('validation', 'badRequest', 'conflict')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Refresh token revoked.' })
   @ApiOperation({ summary: 'Revoke a refresh token' })
   @ApiBody({ type: RefreshTokenDto })
   async signOut(@Body() body: RefreshTokenDto): Promise<void> {
@@ -116,27 +144,41 @@ export class AuthController {
   @Public()
   @Throttle(AUTH_THROTTLE)
   @Post('password-reset/request')
+  @ApiErrors('validation', 'badRequest', 'conflict')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({
+    description:
+      'Accepted. Always 204, whether or not the address exists, so the endpoint cannot be used to enumerate accounts.',
+  })
   @ApiOperation({
     summary: 'Request a password-reset link',
     description:
       'Always returns 204, whether or not the address exists — an endpoint that 404s on unknown emails is a free account-enumeration oracle.',
   })
   @ApiBody({ type: RequestPasswordResetDto })
-  async requestPasswordReset(@Body() body: RequestPasswordResetDto): Promise<void> {
+  async requestPasswordReset(
+    @Body() body: RequestPasswordResetDto,
+  ): Promise<void> {
     await this.passwordResetService.request(body.email);
   }
 
   @Public()
   @Throttle(AUTH_THROTTLE)
   @Post('password-reset/confirm')
+  @ApiErrors('validation', 'badRequest', 'conflict')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({
+    description: 'Password changed and every existing session revoked.',
+  })
   @ApiOperation({
     summary: 'Set a new password using a reset token',
-    description: 'Consumes the token and revokes every active session for that user.',
+    description:
+      'Consumes the token and revokes every active session for that user.',
   })
   @ApiBody({ type: ConfirmPasswordResetDto })
-  async confirmPasswordReset(@Body() body: ConfirmPasswordResetDto): Promise<void> {
+  async confirmPasswordReset(
+    @Body() body: ConfirmPasswordResetDto,
+  ): Promise<void> {
     await this.passwordResetService.confirm(body.token, body.password);
   }
 
@@ -147,7 +189,14 @@ export class AuthController {
     description:
       'The web client renders its navigation from the returned permission list, so the UI can never offer an action the API would reject.',
   })
-  @ApiOkResponse({ description: 'Current session' })
+  @ApiUnauthorizedResponse({
+    description: 'Missing or invalid access token',
+    type: ApiErrorResponse,
+  })
+  @ApiOkResponse({
+    type: CurrentSessionResponse,
+    description: 'Current session',
+  })
   async me(
     @CurrentUser() user: RequestUser,
     @Req() request: MaybeAuthenticatedRequest,
@@ -157,14 +206,20 @@ export class AuthController {
 
   @SkipOrgContext()
   @Post('sign-out-all')
+  @ApiErrors('badRequest', 'conflict')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({
+    description: 'Every refresh token for this user revoked.',
+  })
   @ApiOperation({ summary: 'Revoke every active session for the current user' })
   async signOutAll(@CurrentUser() user: RequestUser): Promise<void> {
     await this.tokenService.revokeAllForUser(user.id);
   }
 
   /** Extracts user agent and client IP for the stored session record. */
-  private static clientInfo(request: MaybeAuthenticatedRequest): TokenClientInfo {
+  private static clientInfo(
+    request: MaybeAuthenticatedRequest,
+  ): TokenClientInfo {
     return {
       userAgent: request.headers['user-agent'],
       ipAddress: request.ip,

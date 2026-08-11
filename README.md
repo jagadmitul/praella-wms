@@ -31,6 +31,7 @@ Postgres runs on **5437** and Redis on **6381** to avoid clashing with anything 
 ```bash
 pnpm build / typecheck / lint
 pnpm test                 # 74 unit + frontend
+pnpm --filter @wms/api openapi   # regenerate apps/api/openapi.json
 pnpm test:e2e             # 86 integration (needs Docker)
 pnpm db:migrate | db:deploy | db:seed | db:studio | db:dump
 pnpm infra:up | infra:down | infra:reset
@@ -189,6 +190,10 @@ The dashboard imports the same matrix to build its navigation, so the UI cannot 
 ## API
 
 Swagger at `/docs`. All routes under `/api/v1`; send `Authorization: Bearer <token>`, and `x-organization-id` when the user belongs to more than one organisation. `/health`, `/health/ready` and `/metrics` are version-neutral so a load balancer needs no reconfiguring at v2.
+
+The document is complete rather than decorative: all 80 operations carry a typed request body or query schema, a typed 2xx response, and the failure codes that operation can actually return — derived from the exceptions its service throws, not blanket-applied. `pnpm --filter @wms/api openapi` regenerates the committed [`apps/api/openapi.json`](apps/api/openapi.json), so an undocumented API change shows up as a diff in review.
+
+Request and response schemas come from the same Zod definitions in `packages/contracts`, each written as `satisfies z.ZodType<TheInterface>` — so a response shape that drifts from its TypeScript type fails the build rather than quietly misleading whoever generates a client from the spec.
 
 Every failure returns the same shape, with a `requestId` that is echoed in the `x-request-id` header and appears in the logs:
 

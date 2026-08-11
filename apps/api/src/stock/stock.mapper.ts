@@ -1,5 +1,12 @@
-import type { MovementType, StockLevelView, StockMovementView } from '@wms/contracts';
-import { toMoneyString, toNullableMoneyString } from '../common/utils/decimal.util';
+import type {
+  MovementType,
+  StockLevelView,
+  StockMovementView,
+} from '@wms/contracts';
+import {
+  toMoneyString,
+  toNullableMoneyString,
+} from '../common/utils/decimal.util';
 import type { Prisma } from '../generated/prisma/client';
 
 export const MOVEMENT_INCLUDE = {
@@ -10,12 +17,18 @@ export const MOVEMENT_INCLUDE = {
 } satisfies Prisma.StockMovementInclude;
 
 export const STOCK_LEVEL_INCLUDE = {
-  product: { select: { id: true, name: true, sku: true, unit: true, unitPrice: true } },
+  product: {
+    select: { id: true, name: true, sku: true, unit: true, unitPrice: true },
+  },
   warehouse: { select: { id: true, name: true, code: true } },
 } satisfies Prisma.StockLevelInclude;
 
-type MovementRow = Prisma.StockMovementGetPayload<{ include: typeof MOVEMENT_INCLUDE }>;
-type StockLevelRow = Prisma.StockLevelGetPayload<{ include: typeof STOCK_LEVEL_INCLUDE }>;
+type MovementRow = Prisma.StockMovementGetPayload<{
+  include: typeof MOVEMENT_INCLUDE;
+}>;
+type StockLevelRow = Prisma.StockLevelGetPayload<{
+  include: typeof STOCK_LEVEL_INCLUDE;
+}>;
 
 /** Movement types that increase the affected warehouse's balance. */
 const INBOUND_TYPES: readonly MovementType[] = ['INBOUND', 'TRANSFER_IN'];
@@ -32,11 +45,11 @@ const INBOUND_TYPES: readonly MovementType[] = ['INBOUND', 'TRANSFER_IN'];
  * @returns The serialisable movement view.
  */
 export function toMovementView(movement: MovementRow): StockMovementView {
-  const isInbound = INBOUND_TYPES.includes(movement.type as MovementType);
+  const isInbound = INBOUND_TYPES.includes(movement.type);
 
   return {
     id: movement.id,
-    type: movement.type as MovementType,
+    type: movement.type,
     quantity: movement.quantity,
     balanceAfter: movement.balanceAfter,
     unitCost: toNullableMoneyString(movement.unitCost),
@@ -45,8 +58,12 @@ export function toMovementView(movement: MovementRow): StockMovementView {
     referenceId: movement.referenceId,
     referenceCode: movement.referenceCode,
     product: movement.product,
-    sourceWarehouse: isInbound ? movement.counterpartWarehouse : movement.warehouse,
-    destinationWarehouse: isInbound ? movement.warehouse : movement.counterpartWarehouse,
+    sourceWarehouse: isInbound
+      ? movement.counterpartWarehouse
+      : movement.warehouse,
+    destinationWarehouse: isInbound
+      ? movement.warehouse
+      : movement.counterpartWarehouse,
     createdBy: movement.createdBy,
     createdAt: movement.createdAt.toISOString(),
   };
@@ -66,7 +83,8 @@ export function toStockLevelView(level: StockLevelRow): StockLevelView {
     availableQuantity: level.quantity - level.reservedQuantity,
     reorderPoint: level.reorderPoint,
     reorderQuantity: level.reorderQuantity,
-    isBelowThreshold: level.reorderPoint > 0 && level.quantity <= level.reorderPoint,
+    isBelowThreshold:
+      level.reorderPoint > 0 && level.quantity <= level.reorderPoint,
     product: {
       id: level.product.id,
       name: level.product.name,

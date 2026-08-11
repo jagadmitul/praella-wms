@@ -2,8 +2,9 @@ import 'reflect-metadata';
 import { Logger, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
+import { buildOpenApiConfig } from './openapi.config';
 import compression from 'compression';
 import express from 'express';
 import helmet from 'helmet';
@@ -45,40 +46,22 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: configService.getOrThrow<string[]>('CORS_ORIGINS'),
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-organization-id', 'x-request-id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-organization-id',
+      'x-request-id',
+    ],
     exposedHeaders: ['x-request-id'],
   });
 
-  app.setGlobalPrefix('api', { exclude: ['health', 'health/ready', 'metrics'] });
+  app.setGlobalPrefix('api', {
+    exclude: ['health', 'health/ready', 'metrics'],
+  });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
   app.enableShutdownHooks();
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Warehouse & Inventory Management API')
-    .setDescription(
-      [
-        'REST API for a multi-tenant warehouse and inventory management system.',
-        '',
-        '**Authentication** — call `POST /api/v1/auth/sign-in`, then send the access token as `Authorization: Bearer <token>`.',
-        '',
-        '**Organisation context** — every tenant-scoped route resolves the organisation from the `x-organization-id` header. It may be omitted when the user belongs to exactly one organisation.',
-        '',
-        '**Errors** — every failure returns the same body shape: `{ statusCode, error, message, details?, path, timestamp, requestId }`.',
-      ].join('\n'),
-    )
-    .setVersion('1.0.0')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'access-token',
-    )
-    .addGlobalParameters({
-      name: 'x-organization-id',
-      in: 'header',
-      required: false,
-      schema: { type: 'string' },
-      description: 'Organisation to act within.',
-    })
-    .build();
+  const swaggerConfig = buildOpenApiConfig();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('docs', app, cleanupOpenApiDoc(document), {

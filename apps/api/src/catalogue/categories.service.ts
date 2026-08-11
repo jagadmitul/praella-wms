@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type {
   CategoryView,
   CreateCategoryInput,
@@ -8,7 +12,11 @@ import type {
 } from '@wms/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheService } from '../cache/cache.service';
-import { buildOrderBy, paginate, toPrismaPage } from '../common/utils/pagination.util';
+import {
+  buildOrderBy,
+  paginate,
+  toPrismaPage,
+} from '../common/utils/pagination.util';
 import { slugify } from '../common/utils/slug.util';
 import type { OrgContext } from '../common/types/request-context';
 import type { Prisma } from '../generated/prisma/client';
@@ -35,20 +43,31 @@ export class CategoriesService {
   ): Promise<Paginated<CategoryView>> {
     const where: Prisma.CategoryWhereInput = {
       organizationId: orgContext.organizationId,
-      ...(query.search ? { name: { contains: query.search, mode: 'insensitive' } } : {}),
+      ...(query.search
+        ? { name: { contains: query.search, mode: 'insensitive' } }
+        : {}),
     };
 
     const [rows, totalItems] = await Promise.all([
       this.prisma.category.findMany({
         where,
         ...toPrismaPage(query),
-        orderBy: buildOrderBy(query.sortBy, query.sortDir, SORTABLE_FIELDS, 'name'),
+        orderBy: buildOrderBy(
+          query.sortBy,
+          query.sortDir,
+          SORTABLE_FIELDS,
+          'name',
+        ),
         include: { _count: { select: { products: true } } },
       }),
       this.prisma.category.count({ where }),
     ]);
 
-    return paginate(rows.map(CategoriesService.toView), totalItems, query);
+    return paginate(
+      rows.map((row) => CategoriesService.toView(row)),
+      totalItems,
+      query,
+    );
   }
 
   /**
@@ -94,8 +113,12 @@ export class CategoriesService {
     const category = await this.prisma.category.update({
       where: { id },
       data: {
-        ...(input.name === undefined ? {} : { name: input.name, slug: slugify(input.name) }),
-        ...(input.description === undefined ? {} : { description: input.description }),
+        ...(input.name === undefined
+          ? {}
+          : { name: input.name, slug: slugify(input.name) }),
+        ...(input.description === undefined
+          ? {}
+          : { description: input.description }),
       },
       include: { _count: { select: { products: true } } },
     });
@@ -114,7 +137,9 @@ export class CategoriesService {
   async remove(orgContext: OrgContext, id: string): Promise<void> {
     await this.assertExists(orgContext, id);
 
-    const productCount = await this.prisma.product.count({ where: { categoryId: id } });
+    const productCount = await this.prisma.product.count({
+      where: { categoryId: id },
+    });
     if (productCount > 0) {
       throw new ConflictException(
         `Cannot delete this category: ${productCount} product(s) still use it. Reassign them first.`,
@@ -125,7 +150,10 @@ export class CategoriesService {
     await this.cacheService.invalidateOrganization(orgContext.organizationId);
   }
 
-  private async assertExists(orgContext: OrgContext, id: string): Promise<void> {
+  private async assertExists(
+    orgContext: OrgContext,
+    id: string,
+  ): Promise<void> {
     const found = await this.prisma.category.findFirst({
       where: { id, organizationId: orgContext.organizationId },
       select: { id: true },

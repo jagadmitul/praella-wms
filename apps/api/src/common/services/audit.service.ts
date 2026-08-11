@@ -49,7 +49,10 @@ export class AuditService {
    * @param tx - The active Prisma transaction client.
    * @param entry - The action to record.
    */
-  async recordWithin(tx: Prisma.TransactionClient, entry: AuditEntry): Promise<void> {
+  async recordWithin(
+    tx: Prisma.TransactionClient,
+    entry: AuditEntry,
+  ): Promise<void> {
     await tx.auditLog.create({ data: this.toRow(entry) });
   }
 

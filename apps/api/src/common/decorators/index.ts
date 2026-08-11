@@ -4,9 +4,22 @@ import {
   SetMetadata,
   type ExecutionContext,
 } from '@nestjs/common';
-import { ApiForbiddenResponse, ApiHeader, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiForbiddenResponse,
+  ApiHeader,
+  ApiNotFoundResponse,
+  ApiUnauthorizedResponse,
+  ApiUnprocessableEntityResponse,
+} from '@nestjs/swagger';
+import { ApiErrorResponse } from '../dto/response.dto';
 import type { Permission } from '@wms/contracts';
-import type { AuthenticatedRequest, OrgContext, RequestUser } from '../types/request-context';
+import type {
+  AuthenticatedRequest,
+  OrgContext,
+  RequestUser,
+} from '../types/request-context';
 
 export const IS_PUBLIC_KEY = 'wms:isPublic';
 export const SKIP_ORG_CONTEXT_KEY = 'wms:skipOrgContext';
@@ -39,9 +52,55 @@ export function RequirePermissions(
     SetMetadata(REQUIRED_PERMISSIONS_KEY, permissions),
     ApiForbiddenResponse({
       description: `Requires permission(s): ${permissions.join(', ')}`,
+      type: ApiErrorResponse,
     }),
-    ApiUnauthorizedResponse({ description: 'Missing or invalid access token' }),
+    ApiUnauthorizedResponse({
+      description: 'Missing or invalid access token',
+      type: ApiErrorResponse,
+    }),
   );
+}
+
+/**
+ * Documents the failure responses a route can produce, all carrying the one
+ * shared error body.
+ *
+ * Declared per route rather than globally: a reader should be able to tell from
+ * the document alone whether an endpoint can 404 or 409, and blanketing every
+ * operation with every status would destroy exactly that signal.
+ *
+ * @param codes - Which failures this route can return.
+ */
+export function ApiErrors(
+  ...codes: Array<'validation' | 'notFound' | 'conflict' | 'badRequest'>
+): MethodDecorator & ClassDecorator {
+  const decorators = codes.map((code) => {
+    switch (code) {
+      case 'validation':
+        return ApiUnprocessableEntityResponse({
+          description: 'Request failed schema validation; see `details`.',
+          type: ApiErrorResponse,
+        });
+      case 'notFound':
+        return ApiNotFoundResponse({
+          description: 'No such record in this organisation.',
+          type: ApiErrorResponse,
+        });
+      case 'conflict':
+        return ApiConflictResponse({
+          description:
+            'Conflicts with current state — a duplicate key, an illegal status transition, or a stale `expectedVersion`.',
+          type: ApiErrorResponse,
+        });
+      case 'badRequest':
+        return ApiBadRequestResponse({
+          description: 'Malformed request.',
+          type: ApiErrorResponse,
+        });
+    }
+  });
+
+  return applyDecorators(...decorators);
 }
 
 /** Documents the organisation selector header on Swagger operations. */

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type {
   BulkResult,
   BulkUpdateProductsInput,
@@ -11,7 +15,11 @@ import type {
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheService } from '../cache/cache.service';
 import { AuditService } from '../common/services/audit.service';
-import { buildOrderBy, paginate, toPrismaPage } from '../common/utils/pagination.util';
+import {
+  buildOrderBy,
+  paginate,
+  toPrismaPage,
+} from '../common/utils/pagination.util';
 import { toMoneyString } from '../common/utils/decimal.util';
 import { warehouseScopeFilter } from '../common/utils/warehouse-scope.util';
 import { belowThresholdFilter } from '../stock/stock.service';
@@ -19,7 +27,13 @@ import { runBulk } from '../common/services/bulk.util';
 import type { OrgContext } from '../common/types/request-context';
 import type { Prisma } from '../generated/prisma/client';
 
-const SORTABLE_FIELDS = ['name', 'sku', 'unitPrice', 'createdAt', 'updatedAt'] as const;
+const SORTABLE_FIELDS = [
+  'name',
+  'sku',
+  'unitPrice',
+  'createdAt',
+  'updatedAt',
+] as const;
 
 /** Result of a delete request, which archives rather than orphaning history. */
 export interface ProductDeletionResult {
@@ -57,7 +71,10 @@ export class ProductsService {
    * @param query - Pagination, search and filter options.
    * @returns A page of products.
    */
-  async list(orgContext: OrgContext, query: ProductQuery): Promise<Paginated<ProductView>> {
+  async list(
+    orgContext: OrgContext,
+    query: ProductQuery,
+  ): Promise<Paginated<ProductView>> {
     const scope = warehouseScopeFilter(orgContext);
     const warehouseFilter: Prisma.StockLevelWhereInput = {
       ...(scope ? { warehouseId: scope } : {}),
@@ -88,7 +105,10 @@ export class ProductsService {
       ...(query.lowStockOnly
         ? {
             stockLevels: {
-              some: { ...warehouseFilter, ...belowThresholdFilter(this.prisma) },
+              some: {
+                ...warehouseFilter,
+                ...belowThresholdFilter(this.prisma),
+              },
             },
           }
         : {}),
@@ -98,19 +118,30 @@ export class ProductsService {
       this.prisma.product.findMany({
         where,
         ...toPrismaPage(query),
-        orderBy: buildOrderBy(query.sortBy, query.sortDir, SORTABLE_FIELDS, 'name'),
+        orderBy: buildOrderBy(
+          query.sortBy,
+          query.sortDir,
+          SORTABLE_FIELDS,
+          'name',
+        ),
         include: {
           ...PRODUCT_INCLUDE,
           stockLevels: {
             where: warehouseFilter,
-            include: { warehouse: { select: { id: true, name: true, code: true } } },
+            include: {
+              warehouse: { select: { id: true, name: true, code: true } },
+            },
           },
         },
       }),
       this.prisma.product.count({ where }),
     ]);
 
-    return paginate(rows.map(ProductsService.toView), totalItems, query);
+    return paginate(
+      rows.map((row) => ProductsService.toView(row)),
+      totalItems,
+      query,
+    );
   }
 
   /**
@@ -130,7 +161,9 @@ export class ProductsService {
         ...PRODUCT_INCLUDE,
         stockLevels: {
           where: scope ? { warehouseId: scope } : {},
-          include: { warehouse: { select: { id: true, name: true, code: true } } },
+          include: {
+            warehouse: { select: { id: true, name: true, code: true } },
+          },
         },
       },
     });
@@ -155,7 +188,11 @@ export class ProductsService {
     actorId: string,
     input: CreateProductInput,
   ): Promise<ProductView> {
-    await this.assertReferencesBelongToOrg(orgContext, input.categoryId, input.supplierId);
+    await this.assertReferencesBelongToOrg(
+      orgContext,
+      input.categoryId,
+      input.supplierId,
+    );
 
     const product = await this.prisma.product.create({
       data: {
@@ -174,10 +211,16 @@ export class ProductsService {
       include: PRODUCT_INCLUDE,
     });
 
-    await this.afterMutation(orgContext, actorId, 'product.created', product.id, {
-      sku: product.sku,
-      name: product.name,
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'product.created',
+      product.id,
+      {
+        sku: product.sku,
+        name: product.name,
+      },
+    );
 
     return ProductsService.toView(product);
   }
@@ -198,17 +241,29 @@ export class ProductsService {
     input: UpdateProductInput,
   ): Promise<ProductView> {
     await this.assertExists(orgContext, id);
-    await this.assertReferencesBelongToOrg(orgContext, input.categoryId, input.supplierId);
+    await this.assertReferencesBelongToOrg(
+      orgContext,
+      input.categoryId,
+      input.supplierId,
+    );
 
     const product = await this.prisma.product.update({
       where: { id },
       data: {
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.sku === undefined ? {} : { sku: input.sku }),
-        ...(input.description === undefined ? {} : { description: input.description }),
-        ...(input.categoryId === undefined ? {} : { categoryId: input.categoryId }),
-        ...(input.supplierId === undefined ? {} : { supplierId: input.supplierId }),
-        ...(input.unitPrice === undefined ? {} : { unitPrice: input.unitPrice.toFixed(2) }),
+        ...(input.description === undefined
+          ? {}
+          : { description: input.description }),
+        ...(input.categoryId === undefined
+          ? {}
+          : { categoryId: input.categoryId }),
+        ...(input.supplierId === undefined
+          ? {}
+          : { supplierId: input.supplierId }),
+        ...(input.unitPrice === undefined
+          ? {}
+          : { unitPrice: input.unitPrice.toFixed(2) }),
         ...(input.unit === undefined ? {} : { unit: input.unit }),
         ...(input.defaultReorderPoint === undefined
           ? {}
@@ -274,7 +329,10 @@ export class ProductsService {
       };
     }
 
-    await this.prisma.product.update({ where: { id }, data: { isActive: false } });
+    await this.prisma.product.update({
+      where: { id },
+      data: { isActive: false },
+    });
     await this.afterMutation(orgContext, actorId, 'product.archived', id, {
       sku: product.sku,
       movements,
@@ -310,7 +368,10 @@ export class ProductsService {
     // Scoped to the organisation up front, so an id belonging to another tenant
     // simply is not in the working set.
     const products = await this.prisma.product.findMany({
-      where: { id: { in: input.ids }, organizationId: orgContext.organizationId },
+      where: {
+        id: { in: input.ids },
+        organizationId: orgContext.organizationId,
+      },
       select: { id: true, sku: true, name: true },
     });
 
@@ -320,9 +381,15 @@ export class ProductsService {
         await this.prisma.product.update({
           where: { id: item.id },
           data: {
-            ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
-            ...(input.categoryId === undefined ? {} : { categoryId: input.categoryId }),
-            ...(input.supplierId === undefined ? {} : { supplierId: input.supplierId }),
+            ...(input.isActive === undefined
+              ? {}
+              : { isActive: input.isActive }),
+            ...(input.categoryId === undefined
+              ? {}
+              : { categoryId: input.categoryId }),
+            ...(input.supplierId === undefined
+              ? {}
+              : { supplierId: input.supplierId }),
           },
         });
       },
@@ -341,10 +408,16 @@ export class ProductsService {
     }
     result.requested = input.ids.length;
 
-    await this.afterMutation(orgContext, actorId, 'product.bulk_updated', 'bulk', {
-      count: result.succeeded,
-      changed: Object.keys(input).filter((key) => key !== 'ids'),
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'product.bulk_updated',
+      'bulk',
+      {
+        count: result.succeeded,
+        changed: Object.keys(input).filter((key) => key !== 'ids'),
+      },
+    );
 
     return result;
   }
@@ -380,7 +453,9 @@ export class ProductsService {
         select: { id: true },
       });
       if (!category) {
-        throw new BadRequestException('Category does not exist in this organisation');
+        throw new BadRequestException(
+          'Category does not exist in this organisation',
+        );
       }
     }
 
@@ -390,7 +465,9 @@ export class ProductsService {
         select: { id: true },
       });
       if (!supplier) {
-        throw new BadRequestException('Supplier does not exist in this organisation');
+        throw new BadRequestException(
+          'Supplier does not exist in this organisation',
+        );
       }
     }
   }
@@ -426,10 +503,14 @@ export class ProductsService {
       availableQuantity: level.quantity - level.reservedQuantity,
       reorderPoint: level.reorderPoint,
       reorderQuantity: level.reorderQuantity,
-      isBelowThreshold: level.reorderPoint > 0 && level.quantity <= level.reorderPoint,
+      isBelowThreshold:
+        level.reorderPoint > 0 && level.quantity <= level.reorderPoint,
     }));
 
-    const totalQuantity = stockByWarehouse.reduce((sum, row) => sum + row.quantity, 0);
+    const totalQuantity = stockByWarehouse.reduce(
+      (sum, row) => sum + row.quantity,
+      0,
+    );
     const totalReserved = stockByWarehouse.reduce(
       (sum, row) => sum + row.reservedQuantity,
       0,

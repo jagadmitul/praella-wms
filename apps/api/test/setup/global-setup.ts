@@ -25,9 +25,10 @@ export default async function globalSetup(): Promise<void> {
   const admin = new Client({ connectionString: adminUrl.toString() });
   await admin.connect();
 
-  const existing = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [
-    databaseName,
-  ]);
+  const existing = await admin.query(
+    'SELECT 1 FROM pg_database WHERE datname = $1',
+    [databaseName],
+  );
 
   if (existing.rowCount === 0) {
     // Identifier cannot be parameterised; it comes from our own env, and is

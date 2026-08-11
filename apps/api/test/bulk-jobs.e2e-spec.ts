@@ -1,5 +1,10 @@
 import type { INestApplication } from '@nestjs/common';
-import { api, createTestApp, seedFixture, type Fixture } from './setup/test-app';
+import {
+  api,
+  createTestApp,
+  seedFixture,
+  type Fixture,
+} from './setup/test-app';
 
 /**
  * Background queue coverage.
@@ -27,8 +32,10 @@ describe('Bulk stock jobs (e2e)', () => {
   });
 
   const as = (token: string) => ({
-    get: (path: string) => api(app).get(path).set('Authorization', `Bearer ${token}`),
-    post: (path: string) => api(app).post(path).set('Authorization', `Bearer ${token}`),
+    get: (path: string) =>
+      api(app).get(path).set('Authorization', `Bearer ${token}`),
+    post: (path: string) =>
+      api(app).post(path).set('Authorization', `Bearer ${token}`),
   });
 
   /** Polls a job until it leaves the queued/processing states. */
@@ -90,7 +97,11 @@ describe('Bulk stock jobs (e2e)', () => {
         lines: [
           { sku: fixture.productSku, warehouseCode: 'ALPHA', delta: 10 },
           { sku: 'DOES-NOT-EXIST', warehouseCode: 'ALPHA', delta: 5 },
-          { sku: fixture.productSku, warehouseCode: 'NO-SUCH-WAREHOUSE', delta: 5 },
+          {
+            sku: fixture.productSku,
+            warehouseCode: 'NO-SUCH-WAREHOUSE',
+            delta: 5,
+          },
           { sku: fixture.productSku, warehouseCode: 'ALPHA', delta: -100_000 },
         ],
       })
@@ -102,7 +113,9 @@ describe('Bulk stock jobs (e2e)', () => {
     expect(finished.processedLines).toBe(1);
     expect(finished.failedLines).toBe(3);
 
-    const messages = finished.errors.map((error: { message: string }) => error.message);
+    const messages = finished.errors.map(
+      (error: { message: string }) => error.message,
+    );
     expect(messages[0]).toContain('Unknown SKU');
     expect(messages[1]).toContain('Unknown warehouse code');
     expect(messages[2]).toContain('Insufficient stock');
@@ -117,7 +130,9 @@ describe('Bulk stock jobs (e2e)', () => {
   it('denies STAFF the ability to queue bulk adjustments', async () => {
     await as(fixture.staff.token)
       .post('/api/v1/jobs/bulk-stock-adjustments')
-      .send({ lines: [{ sku: fixture.productSku, warehouseCode: 'ALPHA', delta: 1 }] })
+      .send({
+        lines: [{ sku: fixture.productSku, warehouseCode: 'ALPHA', delta: 1 }],
+      })
       .expect(403);
   });
 

@@ -7,3 +7,4 @@ export * from './catalogue.schema';
 export * from './stock.schema';
 export * from './orders.schema';
 export * from './views';
+export * from './views.schema';

@@ -10,7 +10,19 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
+  MemberListResponse,
+  MemberResponse,
+  OrganizationResponse,
+} from '../common/dto/response.dto';
 import { createZodDto } from 'nestjs-zod';
 import {
   inviteMemberSchema,
@@ -21,7 +33,12 @@ import {
   type OrganizationView,
   type Paginated,
 } from '@wms/contracts';
-import { CurrentOrg, CurrentUser, RequirePermissions } from '../common/decorators';
+import {
+  ApiErrors,
+  CurrentOrg,
+  CurrentUser,
+  RequirePermissions,
+} from '../common/decorators';
 import type { OrgContext, RequestUser } from '../common/types/request-context';
 import { OrganizationsService } from './organizations.service';
 
@@ -39,13 +56,18 @@ export class OrganizationsController {
   @Get()
   @RequirePermissions('org:read')
   @ApiOperation({ summary: 'Get the active organisation' })
-  async current(@CurrentOrg() orgContext: OrgContext): Promise<OrganizationView> {
+  @ApiOkResponse({ type: OrganizationResponse })
+  async current(
+    @CurrentOrg() orgContext: OrgContext,
+  ): Promise<OrganizationView> {
     return this.organizationsService.current(orgContext);
   }
 
   @Patch()
+  @ApiErrors('validation', 'badRequest', 'notFound', 'conflict')
   @RequirePermissions('org:update')
   @ApiOperation({ summary: 'Rename the organisation (admin only)' })
+  @ApiOkResponse({ type: OrganizationResponse })
   async update(
     @CurrentOrg() orgContext: OrgContext,
     @CurrentUser() user: RequestUser,
@@ -58,8 +80,10 @@ export class OrganizationsController {
   @RequirePermissions('member:read')
   @ApiOperation({
     summary: 'List collaborators',
-    description: 'Shows each member’s role and, for staff, their assigned warehouses.',
+    description:
+      'Shows each member’s role and, for staff, their assigned warehouses.',
   })
+  @ApiOkResponse({ type: MemberListResponse })
   async listMembers(
     @CurrentOrg() orgContext: OrgContext,
     @Query() query: MemberQueryDto,
@@ -68,12 +92,14 @@ export class OrganizationsController {
   }
 
   @Post('members')
+  @ApiErrors('validation', 'badRequest', 'notFound', 'conflict')
   @RequirePermissions('member:invite')
   @ApiOperation({
     summary: 'Add a collaborator (admin only)',
     description:
       'Links an existing account by email, or creates one with the supplied temporary password. Staff can be scoped to specific warehouses at the same time.',
   })
+  @ApiCreatedResponse({ type: MemberResponse })
   async inviteMember(
     @CurrentOrg() orgContext: OrgContext,
     @CurrentUser() user: RequestUser,
@@ -83,19 +109,30 @@ export class OrganizationsController {
   }
 
   @Patch('members/:membershipId')
+  @ApiErrors('validation', 'badRequest', 'notFound', 'conflict')
   @RequirePermissions('member:manage')
-  @ApiOperation({ summary: 'Change a member’s role or warehouse assignments (admin only)' })
+  @ApiOperation({
+    summary: 'Change a member’s role or warehouse assignments (admin only)',
+  })
+  @ApiOkResponse({ type: MemberResponse })
   async updateMember(
     @CurrentOrg() orgContext: OrgContext,
     @CurrentUser() user: RequestUser,
     @Param('membershipId') membershipId: string,
     @Body() body: UpdateMemberDto,
   ): Promise<MemberView> {
-    return this.organizationsService.updateMember(orgContext, user.id, membershipId, body);
+    return this.organizationsService.updateMember(
+      orgContext,
+      user.id,
+      membershipId,
+      body,
+    );
   }
 
   @Delete('members/:membershipId')
+  @ApiErrors('badRequest', 'notFound', 'conflict')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Membership removed.' })
   @RequirePermissions('member:manage')
   @ApiOperation({ summary: 'Remove a collaborator (admin only)' })
   async removeMember(
@@ -103,6 +140,10 @@ export class OrganizationsController {
     @CurrentUser() user: RequestUser,
     @Param('membershipId') membershipId: string,
   ): Promise<void> {
-    await this.organizationsService.removeMember(orgContext, user.id, membershipId);
+    await this.organizationsService.removeMember(
+      orgContext,
+      user.id,
+      membershipId,
+    );
   }
 }

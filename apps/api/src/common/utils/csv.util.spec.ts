@@ -60,7 +60,9 @@ describe('CSV utilities', () => {
     });
 
     it('fills missing trailing columns with empty strings', () => {
-      expect(parseCsvRecords('a,b,c\n1,2')).toEqual([{ a: '1', b: '2', c: '' }]);
+      expect(parseCsvRecords('a,b,c\n1,2')).toEqual([
+        { a: '1', b: '2', c: '' },
+      ]);
     });
 
     it('rejects an empty file', () => {

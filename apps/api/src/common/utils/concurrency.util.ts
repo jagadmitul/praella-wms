@@ -56,5 +56,7 @@ export function versionedWhere(
   id: string,
   expectedVersion?: number,
 ): { id: string; version?: number } {
-  return expectedVersion === undefined ? { id } : { id, version: expectedVersion };
+  return expectedVersion === undefined
+    ? { id }
+    : { id, version: expectedVersion };
 }

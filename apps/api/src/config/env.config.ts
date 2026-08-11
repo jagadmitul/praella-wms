@@ -7,7 +7,9 @@ import { z } from 'zod';
  */
 const envSchema = z
   .object({
-    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    NODE_ENV: z
+      .enum(['development', 'test', 'production'])
+      .default('development'),
     PORT: z.coerce.number().int().min(1).max(65535).default(4300),
     CORS_ORIGINS: z
       .string()
@@ -51,8 +53,12 @@ const envSchema = z
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
     OTEL_SERVICE_NAME: z.string().default('wms-api'),
 
-    JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
-    JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
+    JWT_ACCESS_SECRET: z
+      .string()
+      .min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
+    JWT_REFRESH_SECRET: z
+      .string()
+      .min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
     JWT_ACCESS_TTL: z.coerce.number().int().positive().default(900),
     JWT_REFRESH_TTL: z.coerce.number().int().positive().default(1_209_600),
 
@@ -81,7 +87,9 @@ export function validateEnv(raw: Record<string, unknown>): AppEnv {
 
   if (!result.success) {
     const problems = result.error.issues
-      .map((issue) => `  • ${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .map(
+        (issue) => `  • ${issue.path.join('.') || '(root)'}: ${issue.message}`,
+      )
       .join('\n');
     throw new Error(`Invalid environment configuration:\n${problems}`);
   }

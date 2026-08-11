@@ -25,7 +25,9 @@ describe('Rate limiting (e2e)', () => {
       statuses.push((await attempt()).status);
     }
 
-    expect(statuses.filter((status) => status === 401).length).toBeGreaterThan(0);
+    expect(statuses.filter((status) => status === 401).length).toBeGreaterThan(
+      0,
+    );
     expect(statuses).toContain(429);
   });
 });

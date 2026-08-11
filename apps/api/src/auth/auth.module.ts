@@ -8,7 +8,10 @@ import { TokenService } from './token.service';
 import { PasswordResetService } from './password-reset.service';
 
 @Module({
-  imports: [PassportModule.register({ defaultStrategy: 'jwt' }), JwtModule.register({})],
+  imports: [
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    JwtModule.register({}),
+  ],
   controllers: [AuthController],
   providers: [AuthService, TokenService, JwtStrategy, PasswordResetService],
   exports: [AuthService, TokenService, PasswordResetService],

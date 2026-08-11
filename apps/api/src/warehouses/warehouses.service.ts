@@ -9,7 +9,11 @@ import type {
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheService } from '../cache/cache.service';
 import { AuditService } from '../common/services/audit.service';
-import { buildOrderBy, paginate, toPrismaPage } from '../common/utils/pagination.util';
+import {
+  buildOrderBy,
+  paginate,
+  toPrismaPage,
+} from '../common/utils/pagination.util';
 import {
   assertWarehouseAccess,
   warehouseScopeFilter,
@@ -68,13 +72,24 @@ export class WarehousesService {
       this.prisma.warehouse.findMany({
         where,
         ...toPrismaPage(query),
-        orderBy: buildOrderBy(query.sortBy, query.sortDir, SORTABLE_FIELDS, 'name'),
-        include: { stockLevels: { select: { quantity: true, reorderPoint: true } } },
+        orderBy: buildOrderBy(
+          query.sortBy,
+          query.sortDir,
+          SORTABLE_FIELDS,
+          'name',
+        ),
+        include: {
+          stockLevels: { select: { quantity: true, reorderPoint: true } },
+        },
       }),
       this.prisma.warehouse.count({ where }),
     ]);
 
-    return paginate(rows.map(WarehousesService.toView), totalItems, query);
+    return paginate(
+      rows.map((row) => WarehousesService.toView(row)),
+      totalItems,
+      query,
+    );
   }
 
   /**
@@ -90,7 +105,9 @@ export class WarehousesService {
 
     const warehouse = await this.prisma.warehouse.findFirst({
       where: { id, organizationId: orgContext.organizationId },
-      include: { stockLevels: { select: { quantity: true, reorderPoint: true } } },
+      include: {
+        stockLevels: { select: { quantity: true, reorderPoint: true } },
+      },
     });
 
     if (!warehouse) {
@@ -115,13 +132,21 @@ export class WarehousesService {
   ): Promise<WarehouseView> {
     const warehouse = await this.prisma.warehouse.create({
       data: { ...input, organizationId: orgContext.organizationId },
-      include: { stockLevels: { select: { quantity: true, reorderPoint: true } } },
+      include: {
+        stockLevels: { select: { quantity: true, reorderPoint: true } },
+      },
     });
 
-    await this.afterMutation(orgContext, actorId, 'warehouse.created', warehouse.id, {
-      code: warehouse.code,
-      name: warehouse.name,
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'warehouse.created',
+      warehouse.id,
+      {
+        code: warehouse.code,
+        name: warehouse.name,
+      },
+    );
 
     return WarehousesService.toView(warehouse);
   }
@@ -146,7 +171,9 @@ export class WarehousesService {
     const warehouse = await this.prisma.warehouse.update({
       where: { id },
       data: input,
-      include: { stockLevels: { select: { quantity: true, reorderPoint: true } } },
+      include: {
+        stockLevels: { select: { quantity: true, reorderPoint: true } },
+      },
     });
 
     await this.afterMutation(orgContext, actorId, 'warehouse.updated', id, {
@@ -179,7 +206,10 @@ export class WarehousesService {
     const [movements, openOrders, stockOnHand] = await Promise.all([
       this.prisma.stockMovement.count({ where: { warehouseId: id } }),
       this.prisma.purchaseOrder.count({
-        where: { warehouseId: id, status: { notIn: ['RECEIVED', 'CANCELLED'] } },
+        where: {
+          warehouseId: id,
+          status: { notIn: ['RECEIVED', 'CANCELLED'] },
+        },
       }),
       this.prisma.stockLevel.aggregate({
         where: { warehouseId: id },
@@ -202,7 +232,10 @@ export class WarehousesService {
       };
     }
 
-    await this.prisma.warehouse.update({ where: { id }, data: { isActive: false } });
+    await this.prisma.warehouse.update({
+      where: { id },
+      data: { isActive: false },
+    });
     await this.afterMutation(orgContext, actorId, 'warehouse.archived', id, {
       code: warehouse.code,
       movements,
@@ -235,7 +268,10 @@ export class WarehousesService {
     // Only memberships inside this organisation may be assigned, otherwise a
     // caller could hand a stranger access by guessing a membership id.
     const valid = await this.prisma.membership.findMany({
-      where: { id: { in: membershipIds }, organizationId: orgContext.organizationId },
+      where: {
+        id: { in: membershipIds },
+        organizationId: orgContext.organizationId,
+      },
       select: { id: true },
     });
 
@@ -250,9 +286,15 @@ export class WarehousesService {
       }),
     ]);
 
-    await this.afterMutation(orgContext, actorId, 'warehouse.members_assigned', id, {
-      membershipIds: valid.map((membership) => membership.id),
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'warehouse.members_assigned',
+      id,
+      {
+        membershipIds: valid.map((membership) => membership.id),
+      },
+    );
 
     return { assigned: valid.length };
   }
@@ -300,7 +342,9 @@ export class WarehousesService {
   /** Maps a Prisma row plus its stock levels into the API view model. */
   private static toView(
     warehouse: Prisma.WarehouseGetPayload<{
-      include: { stockLevels: { select: { quantity: true; reorderPoint: true } } };
+      include: {
+        stockLevels: { select: { quantity: true; reorderPoint: true } };
+      };
     }>,
   ): WarehouseView {
     const levels = warehouse.stockLevels;
@@ -323,7 +367,8 @@ export class WarehousesService {
         productCount: levels.length,
         totalUnits: levels.reduce((total, level) => total + level.quantity, 0),
         lowStockCount: levels.filter(
-          (level) => level.reorderPoint > 0 && level.quantity <= level.reorderPoint,
+          (level) =>
+            level.reorderPoint > 0 && level.quantity <= level.reorderPoint,
         ).length,
       },
     };

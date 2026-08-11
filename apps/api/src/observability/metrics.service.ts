@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
 /** Upper bounds, in seconds, for the HTTP latency histogram. */
-const LATENCY_BUCKETS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
+const LATENCY_BUCKETS = [
+  0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10,
+];
 
 interface HistogramState {
   buckets: number[];
@@ -47,12 +49,14 @@ export class MetricsService {
     this.requestCounts.set(key, (this.requestCounts.get(key) ?? 0) + 1);
 
     const histogramKey = `${method}|${route}`;
-    const state =
-      this.histograms.get(histogramKey) ??
-      { buckets: new Array<number>(LATENCY_BUCKETS.length).fill(0), sum: 0, count: 0 };
+    const state = this.histograms.get(histogramKey) ?? {
+      buckets: new Array<number>(LATENCY_BUCKETS.length).fill(0),
+      sum: 0,
+      count: 0,
+    };
 
     for (let index = 0; index < LATENCY_BUCKETS.length; index += 1) {
-      if (durationSeconds <= LATENCY_BUCKETS[index]!) {
+      if (durationSeconds <= LATENCY_BUCKETS[index]) {
         state.buckets[index] = (state.buckets[index] ?? 0) + 1;
       }
     }
@@ -94,7 +98,7 @@ export class MetricsService {
     for (const [key, value] of this.requestCounts) {
       const [method, route, status] = key.split('|');
       lines.push(
-        `wms_http_requests_total{method="${method}",route="${escapeLabel(route!)}",status="${status}"} ${value}`,
+        `wms_http_requests_total{method="${method}",route="${escapeLabel(route)}",status="${status}"} ${value}`,
       );
     }
 
@@ -106,7 +110,7 @@ export class MetricsService {
 
     for (const [key, state] of this.histograms) {
       const [method, route] = key.split('|');
-      const labels = `method="${method}",route="${escapeLabel(route!)}"`;
+      const labels = `method="${method}",route="${escapeLabel(route)}"`;
 
       LATENCY_BUCKETS.forEach((bound, index) => {
         lines.push(
@@ -122,11 +126,15 @@ export class MetricsService {
     }
 
     if (this.businessCounters.size > 0) {
-      lines.push('', '# HELP wms_domain_events_total Domain events recorded.', '# TYPE wms_domain_events_total counter');
+      lines.push(
+        '',
+        '# HELP wms_domain_events_total Domain events recorded.',
+        '# TYPE wms_domain_events_total counter',
+      );
 
       for (const [key, value] of this.businessCounters) {
         const [name, rawLabels] = key.split('|');
-        const labels = JSON.parse(rawLabels!) as Record<string, string>;
+        const labels = JSON.parse(rawLabels) as Record<string, string>;
         const rendered = Object.entries(labels)
           .map(([label, labelValue]) => `${label}="${escapeLabel(labelValue)}"`)
           .join(',');
@@ -143,5 +151,8 @@ export class MetricsService {
 
 /** Escapes a Prometheus label value. */
 function escapeLabel(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n');
 }

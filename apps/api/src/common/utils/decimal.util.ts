@@ -39,8 +39,12 @@ export function toNullableMoneyString(value: DecimalLike): string | null {
  * @param quantity - Whole number of units.
  * @returns The line total as a fixed-precision string.
  */
-export function multiplyMoney(unitAmount: DecimalLike, quantity: number): string {
-  const minorUnits = Math.round(Number((unitAmount ?? 0).toString()) * 100) * quantity;
+export function multiplyMoney(
+  unitAmount: DecimalLike,
+  quantity: number,
+): string {
+  const minorUnits =
+    Math.round(Number((unitAmount ?? 0).toString()) * 100) * quantity;
   return (minorUnits / 100).toFixed(2);
 }
 

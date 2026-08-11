@@ -9,7 +9,6 @@ import type {
   CreateInvitationInput,
   InvitationPreview,
   InvitationView,
-  Role,
 } from '@wms/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
@@ -23,7 +22,9 @@ const INVITE_INCLUDE = {
   organization: { select: { name: true } },
 } satisfies Prisma.InvitationInclude;
 
-type InvitationRow = Prisma.InvitationGetPayload<{ include: typeof INVITE_INCLUDE }>;
+type InvitationRow = Prisma.InvitationGetPayload<{
+  include: typeof INVITE_INCLUDE;
+}>;
 
 /**
  * Invitations to join an organisation.
@@ -71,7 +72,9 @@ export class InvitationsService {
     });
 
     if (existingMember) {
-      throw new ConflictException('This person is already a member of the organisation');
+      throw new ConflictException(
+        'This person is already a member of the organisation',
+      );
     }
 
     const pending = await this.prisma.invitation.findFirst({
@@ -91,7 +94,8 @@ export class InvitationsService {
       );
     }
 
-    const warehouseIds = input.role === 'STAFF' ? (input.warehouseIds ?? []) : [];
+    const warehouseIds =
+      input.role === 'STAFF' ? (input.warehouseIds ?? []) : [];
     const token = randomBytes(32).toString('hex');
 
     const invitation = await this.prisma.invitation.create({
@@ -163,7 +167,11 @@ export class InvitationsService {
    * @param actorId - Admin revoking it.
    * @param id - Invitation identifier.
    */
-  async revoke(orgContext: OrgContext, actorId: string, id: string): Promise<void> {
+  async revoke(
+    orgContext: OrgContext,
+    actorId: string,
+    id: string,
+  ): Promise<void> {
     const invitation = await this.prisma.invitation.findFirst({
       where: { id, organizationId: orgContext.organizationId },
     });
@@ -210,7 +218,7 @@ export class InvitationsService {
       email: invitation.email,
       fullName: invitation.fullName,
       organizationName: invitation.organization.name,
-      role: invitation.role as Role,
+      role: invitation.role,
       expiresAt: invitation.expiresAt.toISOString(),
       hasExistingAccount: existingUser !== null,
     };
@@ -327,7 +335,7 @@ export class InvitationsService {
       id: invitation.id,
       email: invitation.email,
       fullName: invitation.fullName,
-      role: invitation.role as Role,
+      role: invitation.role,
       status: InvitationsService.statusOf(invitation),
       expiresAt: invitation.expiresAt.toISOString(),
       acceptedAt: invitation.acceptedAt?.toISOString() ?? null,

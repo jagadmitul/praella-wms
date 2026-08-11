@@ -6,7 +6,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { permissionsForRole, type Role } from '@wms/contracts';
+import { permissionsForRole } from '@wms/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IS_PUBLIC_KEY, SKIP_ORG_CONTEXT_KEY } from '../decorators';
 import type { MaybeAuthenticatedRequest } from '../types/request-context';
@@ -31,7 +31,10 @@ export class OrgContextGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const [isPublic, skipOrgContext] = [IS_PUBLIC_KEY, SKIP_ORG_CONTEXT_KEY].map((key) =>
+    const [isPublic, skipOrgContext] = [
+      IS_PUBLIC_KEY,
+      SKIP_ORG_CONTEXT_KEY,
+    ].map((key) =>
       this.reflector.getAllAndOverride<boolean>(key, [
         context.getHandler(),
         context.getClass(),
@@ -42,17 +45,24 @@ export class OrgContextGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<MaybeAuthenticatedRequest>();
+    const request = context
+      .switchToHttp()
+      .getRequest<MaybeAuthenticatedRequest>();
     if (!request.user) {
       return true; // JwtAuthGuard has already rejected this request.
     }
 
-    const requestedOrganizationId = this.readHeader(request, ORGANIZATION_HEADER);
+    const requestedOrganizationId = this.readHeader(
+      request,
+      ORGANIZATION_HEADER,
+    );
 
     const memberships = await this.prisma.membership.findMany({
       where: {
         userId: request.user.id,
-        ...(requestedOrganizationId ? { organizationId: requestedOrganizationId } : {}),
+        ...(requestedOrganizationId
+          ? { organizationId: requestedOrganizationId }
+          : {}),
       },
       include: {
         organization: { select: { id: true, name: true } },
@@ -75,8 +85,8 @@ export class OrgContextGuard implements CanActivate {
       );
     }
 
-    const membership = memberships[0]!;
-    const role = membership.role as Role;
+    const membership = memberships[0];
+    const role = membership.role;
 
     request.orgContext = {
       organizationId: membership.organizationId,
@@ -88,7 +98,9 @@ export class OrgContextGuard implements CanActivate {
       // A STAFF member with no assignment yet sees nothing, which is safer than
       // silently granting them the whole organisation.
       warehouseScope:
-        role === 'STAFF' ? membership.warehouses.map((link) => link.warehouseId) : null,
+        role === 'STAFF'
+          ? membership.warehouses.map((link) => link.warehouseId)
+          : null,
     };
 
     return true;

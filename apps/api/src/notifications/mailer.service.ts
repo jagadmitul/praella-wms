@@ -41,7 +41,9 @@ export class MailerService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     if (this.transport !== 'smtp') {
-      this.logger.log('Mail transport is "console" — messages are logged, not sent');
+      this.logger.log(
+        'Mail transport is "console" — messages are logged, not sent',
+      );
       return;
     }
 

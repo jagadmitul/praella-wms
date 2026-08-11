@@ -94,15 +94,23 @@ export class TokenService {
    * @returns A new token pair.
    * @throws UnauthorizedException when the token is invalid, expired or reused.
    */
-  async rotate(refreshToken: string, client: TokenClientInfo = {}): Promise<AuthTokens> {
+  async rotate(
+    refreshToken: string,
+    client: TokenClientInfo = {},
+  ): Promise<AuthTokens> {
     let payload: RefreshTokenPayload;
 
     try {
-      payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(refreshToken, {
-        secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
-      });
+      payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
+        refreshToken,
+        {
+          secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
+        },
+      );
     } catch {
-      throw new UnauthorizedException('Refresh token is invalid or has expired');
+      throw new UnauthorizedException(
+        'Refresh token is invalid or has expired',
+      );
     }
 
     if (payload.tokenType !== 'refresh') {
@@ -116,7 +124,9 @@ export class TokenService {
     });
 
     if (!stored || stored.expiresAt.getTime() < Date.now()) {
-      throw new UnauthorizedException('Refresh token is invalid or has expired');
+      throw new UnauthorizedException(
+        'Refresh token is invalid or has expired',
+      );
     }
 
     if (stored.revokedAt) {

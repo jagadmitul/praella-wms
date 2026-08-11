@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type {
   CreateSupplierInput,
   Paginated,
@@ -8,7 +12,11 @@ import type {
 } from '@wms/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { CacheService } from '../cache/cache.service';
-import { buildOrderBy, paginate, toPrismaPage } from '../common/utils/pagination.util';
+import {
+  buildOrderBy,
+  paginate,
+  toPrismaPage,
+} from '../common/utils/pagination.util';
 import type { OrgContext } from '../common/types/request-context';
 import type { Prisma } from '../generated/prisma/client';
 
@@ -49,13 +57,22 @@ export class SuppliersService {
       this.prisma.supplier.findMany({
         where,
         ...toPrismaPage(query),
-        orderBy: buildOrderBy(query.sortBy, query.sortDir, SORTABLE_FIELDS, 'name'),
+        orderBy: buildOrderBy(
+          query.sortBy,
+          query.sortDir,
+          SORTABLE_FIELDS,
+          'name',
+        ),
         include: { _count: { select: { products: true } } },
       }),
       this.prisma.supplier.count({ where }),
     ]);
 
-    return paginate(rows.map(SuppliersService.toView), totalItems, query);
+    return paginate(
+      rows.map((row) => SuppliersService.toView(row)),
+      totalItems,
+      query,
+    );
   }
 
   /**
@@ -142,7 +159,10 @@ export class SuppliersService {
     await this.cacheService.invalidateOrganization(orgContext.organizationId);
   }
 
-  private async assertExists(orgContext: OrgContext, id: string): Promise<void> {
+  private async assertExists(
+    orgContext: OrgContext,
+    id: string,
+  ): Promise<void> {
     const found = await this.prisma.supplier.findFirst({
       where: { id, organizationId: orgContext.organizationId },
       select: { id: true },

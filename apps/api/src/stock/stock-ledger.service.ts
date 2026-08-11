@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import type { MovementReferenceType, MovementType } from '@wms/contracts';
 import type { Prisma, StockLevel } from '../generated/prisma/client';
 
@@ -178,7 +182,7 @@ export class StockLedgerService {
     `;
 
     if (locked.length > 0) {
-      return locked[0]!;
+      return locked[0];
     }
 
     const product = await tx.product.findFirst({
@@ -187,7 +191,9 @@ export class StockLedgerService {
     });
 
     if (!product) {
-      throw new BadRequestException('Product does not exist in this organisation');
+      throw new BadRequestException(
+        'Product does not exist in this organisation',
+      );
     }
 
     // Two requests can race to create the same pair; the unique constraint on

@@ -55,7 +55,9 @@ export async function createTestApp(
   const moduleRef = await builder.compile();
 
   const app = moduleRef.createNestApplication();
-  app.setGlobalPrefix('api', { exclude: ['health', 'health/ready', 'metrics'] });
+  app.setGlobalPrefix('api', {
+    exclude: ['health', 'health/ready', 'metrics'],
+  });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
   await app.init();
@@ -132,11 +134,8 @@ export async function seedFixture(app: INestApplication): Promise<Fixture> {
     'admin@fixture.test',
     'Fixture Logistics',
   );
-  const { actor: outsider, organizationId: outsiderOrganizationId } = await signUp(
-    app,
-    'outsider@other.test',
-    'Other Company',
-  );
+  const { actor: outsider, organizationId: outsiderOrganizationId } =
+    await signUp(app, 'outsider@other.test', 'Other Company');
 
   const asAdmin = (path: string) =>
     api(app).post(path).set('Authorization', `Bearer ${admin.token}`);
@@ -158,7 +157,9 @@ export async function seedFixture(app: INestApplication): Promise<Fixture> {
   ).body.id as string;
 
   const supplierId = (
-    await asAdmin('/api/v1/suppliers').send({ name: 'Acme Supplies' }).expect(201)
+    await asAdmin('/api/v1/suppliers')
+      .send({ name: 'Acme Supplies' })
+      .expect(201)
   ).body.id as string;
 
   const productSku = 'WIDGET-01';
@@ -203,7 +204,12 @@ export async function seedFixture(app: INestApplication): Promise<Fixture> {
   await api(app)
     .post('/api/v1/stock/movements')
     .set('Authorization', `Bearer ${manager.token}`)
-    .send({ productId, warehouseId: warehouseA, type: 'INBOUND', quantity: 500 })
+    .send({
+      productId,
+      warehouseId: warehouseA,
+      type: 'INBOUND',
+      quantity: 500,
+    })
     .expect(201);
 
   return {

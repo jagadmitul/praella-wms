@@ -22,11 +22,14 @@ import {
  * trace and a log line can be joined on the same value the caller saw in the
  * `x-request-id` header.
  */
-export async function startTracing(): Promise<NodeSDK | null> {
+
+// Returns a promise rather than being `async`: nothing here awaits, and the
+// promise-returning signature leaves room for an exporter that does.
+export function startTracing(): Promise<NodeSDK | null> {
   const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 
   if (!endpoint) {
-    return null;
+    return Promise.resolve(null);
   }
 
   const sdk = new NodeSDK({
@@ -45,7 +48,7 @@ export async function startTracing(): Promise<NodeSDK | null> {
 
   sdk.start();
 
-  return sdk;
+  return Promise.resolve(sdk);
 }
 
 /**

@@ -46,7 +46,9 @@ export class PasswordResetService {
     });
 
     if (!user || !user.isActive) {
-      this.logger.log(`Password reset requested for unknown address ${email} — ignored`);
+      this.logger.log(
+        `Password reset requested for unknown address ${email} — ignored`,
+      );
       return;
     }
 

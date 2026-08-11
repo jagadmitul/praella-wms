@@ -35,10 +35,11 @@ describe('role → permission matrix', () => {
   });
 
   it('keeps staff read-only outside of recording movements', () => {
-    const staffWritePermissions = permissionsForRole('STAFF').filter((permission) =>
-      /:(create|update|delete|manage|adjust|transfer|invite|receive|fulfill|assign)$/.test(
-        permission,
-      ),
+    const staffWritePermissions = permissionsForRole('STAFF').filter(
+      (permission) =>
+        /:(create|update|delete|manage|adjust|transfer|invite|receive|fulfill|assign)$/.test(
+          permission,
+        ),
     );
 
     expect(staffWritePermissions).toEqual([]);
@@ -89,9 +90,11 @@ describe('role → permission matrix', () => {
   });
 
   it('requires all declared permissions rather than any of them', () => {
-    expect(roleHasAllPermissions('MANAGER', ['stock:adjust', 'product:create'])).toBe(true);
-    expect(roleHasAllPermissions('MANAGER', ['stock:adjust', 'warehouse:delete'])).toBe(
-      false,
-    );
+    expect(
+      roleHasAllPermissions('MANAGER', ['stock:adjust', 'product:create']),
+    ).toBe(true);
+    expect(
+      roleHasAllPermissions('MANAGER', ['stock:adjust', 'warehouse:delete']),
+    ).toBe(false);
   });
 });

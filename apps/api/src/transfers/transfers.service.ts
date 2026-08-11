@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type {
   CreateTransferInput,
   Paginated,
@@ -29,7 +34,9 @@ const TRANSFER_INCLUDE = {
   },
 } satisfies Prisma.StockTransferInclude;
 
-type TransferRow = Prisma.StockTransferGetPayload<{ include: typeof TRANSFER_INCLUDE }>;
+type TransferRow = Prisma.StockTransferGetPayload<{
+  include: typeof TRANSFER_INCLUDE;
+}>;
 
 /**
  * Warehouse-to-warehouse transfers, modelled as a three-state machine:
@@ -67,11 +74,15 @@ export class TransfersService {
     const where: Prisma.StockTransferWhereInput = {
       organizationId: orgContext.organizationId,
       ...(query.status ? { status: query.status } : {}),
-      ...(query.sourceWarehouseId ? { sourceWarehouseId: query.sourceWarehouseId } : {}),
+      ...(query.sourceWarehouseId
+        ? { sourceWarehouseId: query.sourceWarehouseId }
+        : {}),
       ...(query.destinationWarehouseId
         ? { destinationWarehouseId: query.destinationWarehouseId }
         : {}),
-      ...(query.search ? { code: { contains: query.search, mode: 'insensitive' } } : {}),
+      ...(query.search
+        ? { code: { contains: query.search, mode: 'insensitive' } }
+        : {}),
       // A scoped member sees a transfer if either end is one of their sites.
       ...(scope
         ? {
@@ -93,7 +104,11 @@ export class TransfersService {
       this.prisma.stockTransfer.count({ where }),
     ]);
 
-    return paginate(rows.map(TransfersService.toView), totalItems, query);
+    return paginate(
+      rows.map((row) => TransfersService.toView(row)),
+      totalItems,
+      query,
+    );
   }
 
   /**
@@ -103,7 +118,10 @@ export class TransfersService {
    * @param id - Transfer identifier.
    * @returns The transfer.
    */
-  async findOne(orgContext: OrgContext, id: string): Promise<StockTransferView> {
+  async findOne(
+    orgContext: OrgContext,
+    id: string,
+  ): Promise<StockTransferView> {
     return TransfersService.toView(await this.load(orgContext, id));
   }
 
@@ -134,7 +152,11 @@ export class TransfersService {
     );
 
     const transfer = await this.prisma.$transaction(async (tx) => {
-      const code = await this.counters.next(tx, orgContext.organizationId, 'TRF');
+      const code = await this.counters.next(
+        tx,
+        orgContext.organizationId,
+        'TRF',
+      );
 
       return tx.stockTransfer.create({
         data: {
@@ -156,10 +178,16 @@ export class TransfersService {
       });
     });
 
-    await this.afterMutation(orgContext, actorId, 'stock_transfer.created', transfer.id, {
-      code: transfer.code,
-      items: transfer.items.length,
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'stock_transfer.created',
+      transfer.id,
+      {
+        code: transfer.code,
+        items: transfer.items.length,
+      },
+    );
 
     return TransfersService.toView(transfer);
   }
@@ -178,7 +206,7 @@ export class TransfersService {
     id: string,
   ): Promise<StockTransferView> {
     const transfer = await this.load(orgContext, id);
-    TransfersService.assertStatus(transfer.status as StockTransferStatus, ['DRAFT']);
+    TransfersService.assertStatus(transfer.status, ['DRAFT']);
     assertWarehousesAccess(orgContext, [transfer.sourceWarehouseId]);
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -205,9 +233,15 @@ export class TransfersService {
       });
     });
 
-    await this.afterMutation(orgContext, actorId, 'stock_transfer.dispatched', id, {
-      code: transfer.code,
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'stock_transfer.dispatched',
+      id,
+      {
+        code: transfer.code,
+      },
+    );
 
     return TransfersService.toView(updated);
   }
@@ -226,7 +260,7 @@ export class TransfersService {
     id: string,
   ): Promise<StockTransferView> {
     const transfer = await this.load(orgContext, id);
-    TransfersService.assertStatus(transfer.status as StockTransferStatus, ['IN_TRANSIT']);
+    TransfersService.assertStatus(transfer.status, ['IN_TRANSIT']);
     assertWarehousesAccess(orgContext, [transfer.destinationWarehouseId]);
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -248,14 +282,24 @@ export class TransfersService {
 
       return tx.stockTransfer.update({
         where: { id },
-        data: { status: 'COMPLETED', completedAt: new Date(), version: { increment: 1 } },
+        data: {
+          status: 'COMPLETED',
+          completedAt: new Date(),
+          version: { increment: 1 },
+        },
         include: TRANSFER_INCLUDE,
       });
     });
 
-    await this.afterMutation(orgContext, actorId, 'stock_transfer.completed', id, {
-      code: transfer.code,
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'stock_transfer.completed',
+      id,
+      {
+        code: transfer.code,
+      },
+    );
 
     return TransfersService.toView(updated);
   }
@@ -274,10 +318,7 @@ export class TransfersService {
     id: string,
   ): Promise<StockTransferView> {
     const transfer = await this.load(orgContext, id);
-    TransfersService.assertStatus(transfer.status as StockTransferStatus, [
-      'DRAFT',
-      'IN_TRANSIT',
-    ]);
+    TransfersService.assertStatus(transfer.status, ['DRAFT', 'IN_TRANSIT']);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (transfer.status === 'IN_TRANSIT') {
@@ -306,10 +347,16 @@ export class TransfersService {
       });
     });
 
-    await this.afterMutation(orgContext, actorId, 'stock_transfer.cancelled', id, {
-      code: transfer.code,
-      returnedToSource: transfer.status === 'IN_TRANSIT',
-    });
+    await this.afterMutation(
+      orgContext,
+      actorId,
+      'stock_transfer.cancelled',
+      id,
+      {
+        code: transfer.code,
+        returnedToSource: transfer.status === 'IN_TRANSIT',
+      },
+    );
 
     return TransfersService.toView(updated);
   }
@@ -343,11 +390,16 @@ export class TransfersService {
     warehouseIds: string[],
   ): Promise<void> {
     const found = await this.prisma.warehouse.count({
-      where: { id: { in: warehouseIds }, organizationId: orgContext.organizationId },
+      where: {
+        id: { in: warehouseIds },
+        organizationId: orgContext.organizationId,
+      },
     });
 
     if (found !== new Set(warehouseIds).size) {
-      throw new BadRequestException('One or more warehouses do not exist in this organisation');
+      throw new BadRequestException(
+        'One or more warehouses do not exist in this organisation',
+      );
     }
   }
 
@@ -356,11 +408,16 @@ export class TransfersService {
     productIds: string[],
   ): Promise<void> {
     const found = await this.prisma.product.count({
-      where: { id: { in: productIds }, organizationId: orgContext.organizationId },
+      where: {
+        id: { in: productIds },
+        organizationId: orgContext.organizationId,
+      },
     });
 
     if (found !== new Set(productIds).size) {
-      throw new BadRequestException('One or more products do not exist in this organisation');
+      throw new BadRequestException(
+        'One or more products do not exist in this organisation',
+      );
     }
   }
 
@@ -389,7 +446,7 @@ export class TransfersService {
       id: transfer.id,
       code: transfer.code,
       version: transfer.version,
-      status: transfer.status as StockTransferStatus,
+      status: transfer.status,
       notes: transfer.notes,
       sourceWarehouse: transfer.sourceWarehouse,
       destinationWarehouse: transfer.destinationWarehouse,

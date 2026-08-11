@@ -18,7 +18,9 @@ export class JsonLogger extends ConsoleLogger {
 
   constructor() {
     super();
-    this.asJson = process.env.LOG_FORMAT === 'json' || process.env.NODE_ENV === 'production';
+    this.asJson =
+      process.env.LOG_FORMAT === 'json' ||
+      process.env.NODE_ENV === 'production';
   }
 
   /** Correlation id for the request currently being handled, if any. */
@@ -53,7 +55,11 @@ export class JsonLogger extends ConsoleLogger {
     this.emit('verbose', message, rest);
   }
 
-  private emit(level: LogLevel | 'info', message: unknown, rest: unknown[]): void {
+  private emit(
+    level: LogLevel | 'info',
+    message: unknown,
+    rest: unknown[],
+  ): void {
     if (!this.asJson) {
       switch (level) {
         case 'error':
@@ -76,7 +82,8 @@ export class JsonLogger extends ConsoleLogger {
 
     // Nest passes the context as the last string argument; anything else is
     // supplementary detail such as a stack trace.
-    const context = typeof rest.at(-1) === 'string' ? (rest.at(-1) as string) : undefined;
+    const context =
+      typeof rest.at(-1) === 'string' ? (rest.at(-1) as string) : undefined;
     const detail = context ? rest.slice(0, -1) : rest;
 
     const line: Record<string, unknown> = {

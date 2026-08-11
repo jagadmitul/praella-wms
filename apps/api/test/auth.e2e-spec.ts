@@ -1,5 +1,10 @@
 import type { INestApplication } from '@nestjs/common';
-import { api, createTestApp, resetDatabase, TEST_PASSWORD } from './setup/test-app';
+import {
+  api,
+  createTestApp,
+  resetDatabase,
+  TEST_PASSWORD,
+} from './setup/test-app';
 
 describe('Authentication (e2e)', () => {
   let app: INestApplication;
@@ -57,13 +62,16 @@ describe('Authentication (e2e)', () => {
         .expect(422);
 
       expect(response.body.error).toBe('Validation Failed');
-      expect(response.body.details.map((d: { path: string }) => d.path)).toContain(
-        'password',
-      );
+      expect(
+        response.body.details.map((d: { path: string }) => d.path),
+      ).toContain('password');
     });
 
     it('rejects a duplicate email with 409', async () => {
-      await api(app).post('/api/v1/auth/sign-up').send(signUpPayload).expect(201);
+      await api(app)
+        .post('/api/v1/auth/sign-up')
+        .send(signUpPayload)
+        .expect(201);
 
       await api(app)
         .post('/api/v1/auth/sign-up')
@@ -72,7 +80,10 @@ describe('Authentication (e2e)', () => {
     });
 
     it('gives each organisation a unique slug even for identical names', async () => {
-      await api(app).post('/api/v1/auth/sign-up').send(signUpPayload).expect(201);
+      await api(app)
+        .post('/api/v1/auth/sign-up')
+        .send(signUpPayload)
+        .expect(201);
 
       const second = await api(app)
         .post('/api/v1/auth/sign-up')
@@ -87,7 +98,10 @@ describe('Authentication (e2e)', () => {
 
   describe('sign-in', () => {
     beforeEach(async () => {
-      await api(app).post('/api/v1/auth/sign-up').send(signUpPayload).expect(201);
+      await api(app)
+        .post('/api/v1/auth/sign-up')
+        .send(signUpPayload)
+        .expect(201);
     });
 
     it('issues tokens for correct credentials', async () => {
@@ -145,7 +159,10 @@ describe('Authentication (e2e)', () => {
         .expect(200);
 
       // Replaying the original token is the signature of a stolen credential.
-      await api(app).post('/api/v1/auth/refresh').send({ refreshToken }).expect(401);
+      await api(app)
+        .post('/api/v1/auth/refresh')
+        .send({ refreshToken })
+        .expect(401);
 
       // …and the legitimate client's newer token is revoked too, as a precaution.
       await api(app)
@@ -177,8 +194,14 @@ describe('Authentication (e2e)', () => {
     });
 
     it('invalidates a refresh token after sign-out', async () => {
-      await api(app).post('/api/v1/auth/sign-out').send({ refreshToken }).expect(204);
-      await api(app).post('/api/v1/auth/refresh').send({ refreshToken }).expect(401);
+      await api(app)
+        .post('/api/v1/auth/sign-out')
+        .send({ refreshToken })
+        .expect(204);
+      await api(app)
+        .post('/api/v1/auth/refresh')
+        .send({ refreshToken })
+        .expect(401);
     });
   });
 

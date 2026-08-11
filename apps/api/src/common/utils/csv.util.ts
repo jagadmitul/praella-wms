@@ -20,7 +20,7 @@ export function parseCsv(input: string): string[][] {
   const text = input.replace(/\r\n?/g, '\n');
 
   for (let index = 0; index < text.length; index += 1) {
-    const char = text[index]!;
+    const char = text[index];
 
     if (inQuotes) {
       if (char === '"') {
@@ -57,7 +57,9 @@ export function parseCsv(input: string): string[][] {
     rows.push(row);
   }
 
-  return rows.filter((candidate) => candidate.some((cell) => cell.trim() !== ''));
+  return rows.filter((candidate) =>
+    candidate.some((cell) => cell.trim() !== ''),
+  );
 }
 
 /**
@@ -74,7 +76,7 @@ export function parseCsvRecords(input: string): Array<Record<string, string>> {
     throw new Error('The CSV file is empty');
   }
 
-  const headers = rows[0]!.map((header) => header.trim());
+  const headers = rows[0].map((header) => header.trim());
 
   return rows.slice(1).map((row) =>
     headers.reduce<Record<string, string>>((record, header, column) => {
@@ -88,7 +90,17 @@ export function parseCsvRecords(input: string): Array<Record<string, string>> {
 function escapeCell(value: unknown): string {
   if (value === null || value === undefined) return '';
 
-  const text = String(value);
+  // Anything that is not already a primitive is serialised as JSON rather than
+  // stringified: `String({})` yields "[object Object]", which is worse than
+  // useless in an export a human is going to open in a spreadsheet.
+  const text =
+    typeof value === 'string'
+      ? value
+      : typeof value === 'number' || typeof value === 'boolean'
+        ? String(value)
+        : value instanceof Date
+          ? value.toISOString()
+          : JSON.stringify(value);
 
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
@@ -107,7 +119,9 @@ export function toCsv<TRow>(
   const lines = [columns.map((column) => escapeCell(column.header)).join(',')];
 
   for (const row of rows) {
-    lines.push(columns.map((column) => escapeCell(column.value(row))).join(','));
+    lines.push(
+      columns.map((column) => escapeCell(column.value(row))).join(','),
+    );
   }
 
   return `${lines.join('\n')}\n`;

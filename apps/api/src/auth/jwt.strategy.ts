@@ -45,7 +45,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Account no longer exists or has been deactivated');
+      throw new UnauthorizedException(
+        'Account no longer exists or has been deactivated',
+      );
     }
 
     return { id: user.id, email: user.email, fullName: user.fullName };

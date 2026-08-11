@@ -22,6 +22,15 @@ import type { MaybeAuthenticatedRequest } from '../types/request-context';
  * violation becomes a 409 naming the conflicting field, not a 500 with a stack
  * trace and the table's physical column names.
  */
+/**
+ * `HttpStatus.INTERNAL_SERVER_ERROR` widened to a plain number.
+ *
+ * Statuses arrive here as numbers from many sources — Nest exceptions, Prisma
+ * error mapping, thrown literals — so comparing one against an enum member is
+ * a cross-type comparison. Widening once, here, keeps the call site readable.
+ */
+const SERVER_ERROR_THRESHOLD: number = HttpStatus.INTERNAL_SERVER_ERROR;
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -43,13 +52,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
       requestId: request.requestId ?? 'unknown',
     };
 
-    if (resolved.status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+    if (resolved.status >= SERVER_ERROR_THRESHOLD) {
       this.logger.error(
         `${request.method} ${body.path} → ${resolved.status} ${resolved.message}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
     } else {
-      this.logger.warn(`${request.method} ${body.path} → ${resolved.status} ${resolved.message}`);
+      this.logger.warn(
+        `${request.method} ${body.path} → ${resolved.status} ${resolved.message}`,
+      );
     }
 
     response.status(resolved.status).json(body);
@@ -89,7 +100,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const message =
         typeof payload === 'string'
           ? payload
-          : ((payload as { message?: string | string[] }).message ?? exception.message);
+          : ((payload as { message?: string | string[] }).message ??
+            exception.message);
 
       return {
         status: exception.getStatus(),
@@ -114,7 +126,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     error: string;
     message: string;
   } {
-    const target = (exception.meta?.target as string[] | string | undefined) ?? [];
+    const target =
+      (exception.meta?.target as string[] | string | undefined) ?? [];
     const fields = Array.isArray(target) ? target.join(', ') : target;
 
     switch (exception.code) {
@@ -130,7 +143,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
         return {
           status: HttpStatus.CONFLICT,
           error: 'Conflict',
-          message: 'This record is referenced by other records and cannot be changed',
+          message:
+            'This record is referenced by other records and cannot be changed',
         };
       case 'P2025':
         return {
@@ -155,7 +169,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
   }
 
   private statusName(status: number): string {
-    const name = Object.entries(HttpStatus).find(([, value]) => value === status)?.[0];
+    const name = Object.entries(HttpStatus).find(
+      ([, value]) => (value as unknown as number) === status,
+    )?.[0];
     return name
       ? name
           .toLowerCase()

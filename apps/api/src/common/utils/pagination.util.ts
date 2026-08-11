@@ -1,4 +1,8 @@
-import { buildPaginationMeta, type Paginated, type PaginationQuery } from '@wms/contracts';
+import {
+  buildPaginationMeta,
+  type Paginated,
+  type PaginationQuery,
+} from '@wms/contracts';
 
 /** Prisma `skip`/`take` derived from a page number and size. */
 export interface PrismaPageArgs {
@@ -12,7 +16,9 @@ export interface PrismaPageArgs {
  * @param query - Validated pagination query.
  * @returns `skip` and `take` for a Prisma `findMany`.
  */
-export function toPrismaPage(query: Pick<PaginationQuery, 'page' | 'pageSize'>): PrismaPageArgs {
+export function toPrismaPage(
+  query: Pick<PaginationQuery, 'page' | 'pageSize'>,
+): PrismaPageArgs {
   return {
     skip: (query.page - 1) * query.pageSize,
     take: query.pageSize,
@@ -57,6 +63,8 @@ export function buildOrderBy<TField extends string>(
   allowed: readonly TField[],
   fallback: TField,
 ): Record<string, 'asc' | 'desc'> {
-  const field = allowed.includes(sortBy as TField) ? (sortBy as TField) : fallback;
+  const field = allowed.includes(sortBy as TField)
+    ? (sortBy as TField)
+    : fallback;
   return { [field]: sortDir };
 }

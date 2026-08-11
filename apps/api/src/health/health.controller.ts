@@ -1,5 +1,17 @@
-import { Controller, Get, Inject, Optional, VERSION_NEUTRAL } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Inject,
+  Optional,
+  VERSION_NEUTRAL,
+} from '@nestjs/common';
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiServiceUnavailableResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { LiveHealthResponse } from '../common/dto/response.dto';
 import {
   HealthCheck,
   HealthCheckService,
@@ -34,6 +46,7 @@ export class HealthController {
   @Public()
   @Get()
   @ApiOperation({ summary: 'Liveness probe' })
+  @ApiOkResponse({ type: LiveHealthResponse })
   live(): { status: string; uptimeSeconds: number; timestamp: string } {
     return {
       status: 'ok',
@@ -46,6 +59,11 @@ export class HealthController {
   @Get('ready')
   @HealthCheck()
   @ApiOperation({ summary: 'Readiness probe — checks PostgreSQL and Redis' })
+  @ApiOkResponse({ description: 'Every dependency reachable.' })
+  @ApiServiceUnavailableResponse({
+    description:
+      'At least one dependency is down. The body names which one, so an operator does not have to guess.',
+  })
   async ready(): Promise<HealthCheckResult> {
     return this.health.check([
       () => this.checkDatabase(),

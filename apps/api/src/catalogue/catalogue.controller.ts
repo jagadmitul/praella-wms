@@ -10,9 +10,26 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
+  CategoryListResponse,
+  CategoryResponse,
+  SupplierListResponse,
+  SupplierResponse,
+} from '../common/dto/response.dto';
 import type { CategoryView, Paginated, SupplierView } from '@wms/contracts';
-import { CurrentOrg, RequirePermissions } from '../common/decorators';
+import {
+  ApiErrors,
+  CurrentOrg,
+  RequirePermissions,
+} from '../common/decorators';
 import type { OrgContext } from '../common/types/request-context';
 import { CategoriesService } from './categories.service';
 import { SuppliersService } from './suppliers.service';
@@ -33,6 +50,7 @@ export class CategoriesController {
   @Get()
   @RequirePermissions('category:read')
   @ApiOperation({ summary: 'List product categories' })
+  @ApiOkResponse({ type: CategoryListResponse })
   async list(
     @CurrentOrg() orgContext: OrgContext,
     @Query() query: CatalogueQueryDto,
@@ -41,8 +59,10 @@ export class CategoriesController {
   }
 
   @Post()
+  @ApiErrors('validation', 'notFound', 'conflict')
   @RequirePermissions('category:manage')
   @ApiOperation({ summary: 'Create a category' })
+  @ApiCreatedResponse({ type: CategoryResponse })
   async create(
     @CurrentOrg() orgContext: OrgContext,
     @Body() body: CreateCategoryDto,
@@ -51,8 +71,10 @@ export class CategoriesController {
   }
 
   @Patch(':id')
+  @ApiErrors('validation', 'notFound', 'conflict')
   @RequirePermissions('category:manage')
   @ApiOperation({ summary: 'Update a category' })
+  @ApiOkResponse({ type: CategoryResponse })
   async update(
     @CurrentOrg() orgContext: OrgContext,
     @Param('id') id: string,
@@ -62,7 +84,9 @@ export class CategoriesController {
   }
 
   @Delete(':id')
+  @ApiErrors('notFound', 'conflict')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Category deleted.' })
   @RequirePermissions('category:manage')
   @ApiOperation({ summary: 'Delete an unused category' })
   async remove(
@@ -82,6 +106,7 @@ export class SuppliersController {
   @Get()
   @RequirePermissions('supplier:read')
   @ApiOperation({ summary: 'List suppliers' })
+  @ApiOkResponse({ type: SupplierListResponse })
   async list(
     @CurrentOrg() orgContext: OrgContext,
     @Query() query: CatalogueQueryDto,
@@ -90,8 +115,10 @@ export class SuppliersController {
   }
 
   @Post()
+  @ApiErrors('validation', 'notFound', 'conflict')
   @RequirePermissions('supplier:manage')
   @ApiOperation({ summary: 'Create a supplier' })
+  @ApiCreatedResponse({ type: SupplierResponse })
   async create(
     @CurrentOrg() orgContext: OrgContext,
     @Body() body: CreateSupplierDto,
@@ -100,8 +127,10 @@ export class SuppliersController {
   }
 
   @Patch(':id')
+  @ApiErrors('validation', 'notFound', 'conflict')
   @RequirePermissions('supplier:manage')
   @ApiOperation({ summary: 'Update a supplier' })
+  @ApiOkResponse({ type: SupplierResponse })
   async update(
     @CurrentOrg() orgContext: OrgContext,
     @Param('id') id: string,
@@ -111,7 +140,9 @@ export class SuppliersController {
   }
 
   @Delete(':id')
+  @ApiErrors('notFound', 'conflict')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Supplier deleted.' })
   @RequirePermissions('supplier:manage')
   @ApiOperation({ summary: 'Delete an unreferenced supplier' })
   async remove(

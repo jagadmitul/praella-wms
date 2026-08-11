@@ -36,7 +36,11 @@ describe('StockLedgerService', () => {
       product: { findFirst: jest.fn() },
     };
 
-    return { tx: tx as unknown as Prisma.TransactionClient, updates, movements };
+    return {
+      tx: tx as unknown as Prisma.TransactionClient,
+      updates,
+      movements,
+    };
   }
 
   const base = {
@@ -71,7 +75,11 @@ describe('StockLedgerService', () => {
     it('allows an ADJUSTMENT in either direction', async () => {
       const { tx, updates } = createTx({ quantity: 100, reservedQuantity: 0 });
 
-      await service.applyMovement(tx, { ...base, type: 'ADJUSTMENT', delta: -12 });
+      await service.applyMovement(tx, {
+        ...base,
+        type: 'ADJUSTMENT',
+        delta: -12,
+      });
       expect(updates[0]).toMatchObject({ quantity: 88 });
 
       const positive = createTx({ quantity: 100, reservedQuantity: 0 });
@@ -104,7 +112,11 @@ describe('StockLedgerService', () => {
     it('allows a movement that lands exactly on zero', async () => {
       const { tx, updates } = createTx({ quantity: 10, reservedQuantity: 0 });
 
-      await service.applyMovement(tx, { ...base, type: 'OUTBOUND', delta: -10 });
+      await service.applyMovement(tx, {
+        ...base,
+        type: 'OUTBOUND',
+        delta: -10,
+      });
 
       expect(updates[0]).toMatchObject({ quantity: 0 });
     });
@@ -150,7 +162,10 @@ describe('StockLedgerService', () => {
 
   describe('ledger rows', () => {
     it('stores an absolute quantity with the direction carried by the type', async () => {
-      const { tx, movements } = createTx({ quantity: 100, reservedQuantity: 0 });
+      const { tx, movements } = createTx({
+        quantity: 100,
+        reservedQuantity: 0,
+      });
 
       await service.applyMovement(tx, {
         ...base,
@@ -168,7 +183,10 @@ describe('StockLedgerService', () => {
     });
 
     it('records the counterpart warehouse on a transfer leg', async () => {
-      const { tx, movements } = createTx({ quantity: 100, reservedQuantity: 0 });
+      const { tx, movements } = createTx({
+        quantity: 100,
+        reservedQuantity: 0,
+      });
 
       await service.applyMovement(tx, {
         ...base,
@@ -205,7 +223,10 @@ describe('StockLedgerService', () => {
     });
 
     it('writes no ledger row, because reserving moves no goods', async () => {
-      const { tx, movements } = createTx({ quantity: 100, reservedQuantity: 0 });
+      const { tx, movements } = createTx({
+        quantity: 100,
+        reservedQuantity: 0,
+      });
 
       await service.adjustReservation(tx, { ...base, reservedDelta: 10 });
 

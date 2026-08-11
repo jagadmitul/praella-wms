@@ -25,7 +25,10 @@ export function warehouseScopeFilter(
  * @param warehouseId - Warehouse the request is trying to touch.
  * @throws ForbiddenException when a scoped membership is not assigned to it.
  */
-export function assertWarehouseAccess(orgContext: OrgContext, warehouseId: string): void {
+export function assertWarehouseAccess(
+  orgContext: OrgContext,
+  warehouseId: string,
+): void {
   if (orgContext.warehouseScope === null) {
     return;
   }
