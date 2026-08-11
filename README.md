@@ -10,6 +10,7 @@ Built as the practical test for the **Senior Backend Developer** role at Praella
 | **Dashboard** | Next.js 16 · App Router · Server Components + Server Actions |
 | **Shared** | One Zod package used by both, so validation rules and the RBAC matrix exist exactly once |
 | **Tests** | **160 passing** — 86 integration, 52 API unit, 22 frontend |
+| **UI** | Responsive 375px up · bulk actions · filters, sorting, page size · skeleton loaders |
 
 ## Live demo
 
@@ -141,7 +142,9 @@ sample-data.sql     generated sample data
 | `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | `900` / `1209600` | Seconds |
 | `THROTTLE_LIMIT` / `AUTH_THROTTLE_LIMIT` | `200` / `10` | Global and auth-route rate limits |
 | `APP_URL` | `http://localhost:3300` | Used to build invite and reset links |
-| `MAIL_TRANSPORT` | `console` | Logs emails instead of sending them |
+| `MAIL_TRANSPORT` | `console` | `console` logs emails; `smtp` sends via `SMTP_*` |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | — | Required when `MAIL_TRANSPORT=smtp` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | — | Set to enable distributed tracing |
 | `LOG_FORMAT` | json in production | |
 | `CORS_ORIGINS` | `http://localhost:3300` | Comma-separated |
 
@@ -246,6 +249,14 @@ Both tokens live in `httpOnly` cookies and never reach client-side JavaScript; a
 
 ### Observability
 JSON logs carry a correlation id via `AsyncLocalStorage`, so a line written deep in a service matches the `x-request-id` header the caller saw. `/metrics` exposes Prometheus counters and a latency histogram labelled by **route template** rather than concrete path — labelling by `/products/abc123` would mint a time series per product and eventually take Prometheus down.
+
+Distributed tracing is available but **off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set**: the auto-instrumentations patch http, `pg` and `ioredis` at require time, and paying that cost plus a background exporter retrying against a collector that isn't there is the wrong default for a demo. Point it at any OTLP backend and HTTP, Postgres and Redis are traced with no further code, each span tagged with the same request id as the logs.
+
+### Bulk actions
+Row selection with a floating action bar covers products, purchase orders, sales orders and transfers. Bulk operations are deliberately **not** transactional across the set: ten orders where three are in the wrong state is the normal case, and rolling back the seven that worked would be actively unhelpful. Each record is attempted independently and the response names exactly which failed and why.
+
+### Email
+`MailerService` has two transports. `console` (the default) logs messages and sends nothing, so invitations and password resets can be completed end to end with no configuration. `smtp` sends for real through any provider that speaks SMTP — Postmark, SES, Resend, Mailgun or a plain mailbox. SMTP rather than a vendor SDK is one dependency instead of one per provider, and changing provider becomes a change of environment variables.
 
 ---
 
@@ -388,11 +399,11 @@ The first would have bitten any reviewer who ran `pnpm install` before creating 
 
 ### Pending items
 
-1. **A generated `is_below_threshold` column.** The threshold comparison now runs in Postgres via a field reference with a supporting index. At much larger scale a stored generated column would let the predicate itself be indexed.
-2. **Editing order lines after creation.** Orders can be created, transitioned and cancelled from the UI; changing a line on an existing draft is still API-only.
-3. **A real email provider.** `MailerService` has one transport that logs, so invitations and resets work end to end with no configuration. Swapping in Postmark or SES means implementing one method.
+1. **A generated `is_below_threshold` column — attempted and deliberately reverted.** The threshold comparison already runs in Postgres via a Prisma field reference with a supporting index. A `STORED` generated column plus a partial index is faster still, and I built it — but Prisma has no syntax for generated columns, and models the result as a `DEFAULT`. Every subsequent `prisma migrate dev` then wants to rewrite the column, which would silently break it. Shipping a permanent schema drift that corrupts a column on the reviewer's first migration is worse than the optimisation is worth at this scale, so it came back out. The route forward is raw SQL access with the column excluded from Prisma's model, which is a bigger change than it earns today.
+2. **Editing order lines in the UI.** The API supports it (`PUT /purchase-orders/:id/items`), guarded to DRAFT and version-checked; the dashboard composer still only creates.
+3. **Per-line receiving and fulfilment in the UI.** The API takes partial quantities per line; the dashboard buttons receive or ship in full.
 4. **Deeper frontend tests.** 22 specs cover the highest-risk client logic; page-level Server Components are covered indirectly by the API suite and by browser QA across all three roles at six breakpoints.
-5. **Distributed tracing.** Structured logs and Prometheus metrics are in place and the correlation-id plumbing is ready; OpenTelemetry spans would be the next step.
+5. **Trace-aware log correlation in the collector.** Spans carry `wms.request_id` and logs carry the same value, but wiring a backend to join them automatically is deployment configuration rather than code.
 
 ---
 

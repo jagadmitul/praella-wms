@@ -6,11 +6,14 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   bulkTransitionSchema,
+  replacePurchaseOrderLinesSchema,
+  replaceSalesOrderLinesSchema,
   type BulkResult,
   type Paginated,
   type PurchaseOrderView,
@@ -34,6 +37,8 @@ import {
 } from './dto/order.dto';
 
 class BulkTransitionDto extends createZodDto(bulkTransitionSchema) {}
+class ReplacePurchaseOrderLinesDto extends createZodDto(replacePurchaseOrderLinesSchema) {}
+class ReplaceSalesOrderLinesDto extends createZodDto(replaceSalesOrderLinesSchema) {}
 
 @ApiTags('Purchase orders')
 @ApiBearerAuth('access-token')
@@ -86,6 +91,22 @@ export class PurchaseOrdersController {
     @Body() body: UpdatePurchaseOrderDto,
   ): Promise<PurchaseOrderView> {
     return this.purchaseOrdersService.update(orgContext, user.id, id, body);
+  }
+
+  @Put(':id/items')
+  @RequirePermissions('purchase_order:manage')
+  @ApiOperation({
+    summary: 'Replace the line items on a draft purchase order',
+    description:
+      'Whole-set replace rather than per-line edits, so the order can never be left half-edited. Draft only — a submitted order has been seen by the supplier, and a received one is bound to ledger entries.',
+  })
+  async replaceLines(
+    @CurrentOrg() orgContext: OrgContext,
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() body: ReplacePurchaseOrderLinesDto,
+  ): Promise<PurchaseOrderView> {
+    return this.purchaseOrdersService.replaceLines(orgContext, user.id, id, body);
   }
 
   @Post(':id/submit')
@@ -210,6 +231,22 @@ export class SalesOrdersController {
     @Body() body: UpdateSalesOrderDto,
   ): Promise<SalesOrderView> {
     return this.salesOrdersService.update(orgContext, user.id, id, body);
+  }
+
+  @Put(':id/items')
+  @RequirePermissions('sales_order:manage')
+  @ApiOperation({
+    summary: 'Replace the line items on a draft sales order',
+    description:
+      'Draft only: an allocated order holds reservations keyed to its current lines, and rewriting them underneath would strand reserved stock.',
+  })
+  async replaceLines(
+    @CurrentOrg() orgContext: OrgContext,
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() body: ReplaceSalesOrderLinesDto,
+  ): Promise<SalesOrderView> {
+    return this.salesOrdersService.replaceLines(orgContext, user.id, id, body);
   }
 
   @Post(':id/allocate')

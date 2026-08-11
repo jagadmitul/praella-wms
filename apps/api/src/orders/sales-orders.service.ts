@@ -8,6 +8,7 @@ import type {
   CreateSalesOrderInput,
   FulfillSalesOrderInput,
   Paginated,
+  ReplaceSalesOrderLinesInput,
   SalesOrderQuery,
   SalesOrderStatus,
   SalesOrderView,
@@ -214,6 +215,73 @@ export class SalesOrdersService {
 
     await this.afterMutation(orgContext, actorId, 'sales_order.updated', id, {
       code: order.code,
+    });
+
+    return SalesOrdersService.toView(updated);
+  }
+
+  /**
+   * Replaces every line on a draft order.
+   *
+   * Restricted to DRAFT because an ALLOCATED order holds stock reservations
+   * that are keyed to its current lines; rewriting them underneath would leave
+   * reserved quantity stranded.
+   *
+   * @param orgContext - Resolved organisation context.
+   * @param actorId - User performing the edit.
+   * @param id - Sales order identifier.
+   * @param input - The complete new set of lines.
+   * @returns The updated order.
+   */
+  async replaceLines(
+    orgContext: OrgContext,
+    actorId: string,
+    id: string,
+    input: ReplaceSalesOrderLinesInput,
+  ): Promise<SalesOrderView> {
+    const order = await this.load(orgContext, id);
+    SalesOrdersService.assertStatus(order.status as SalesOrderStatus, ['DRAFT']);
+    assertVersion('sales order', order.version, input.expectedVersion);
+
+    const productCount = await this.prisma.product.count({
+      where: {
+        id: { in: input.items.map((item) => item.productId) },
+        organizationId: orgContext.organizationId,
+      },
+    });
+
+    if (productCount !== input.items.length) {
+      throw new BadRequestException('One or more products do not exist in this organisation');
+    }
+
+    const totalAmount = sumMoney(
+      input.items.map((item) => multiplyMoney(item.unitPrice, item.quantity)),
+    );
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.salesOrderItem.deleteMany({ where: { salesOrderId: id } });
+
+      return tx.salesOrder.update({
+        where: { id },
+        data: {
+          totalAmount,
+          version: { increment: 1 },
+          items: {
+            create: input.items.map((item) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice.toFixed(2),
+            })),
+          },
+        },
+        include: SO_INCLUDE,
+      });
+    });
+
+    await this.afterMutation(orgContext, actorId, 'sales_order.lines_replaced', id, {
+      code: order.code,
+      lines: input.items.length,
+      totalAmount,
     });
 
     return SalesOrdersService.toView(updated);

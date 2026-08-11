@@ -34,10 +34,22 @@ const envSchema = z
 
     /** Public URL of the dashboard, used to build invite and reset links. */
     APP_URL: z.string().url().default('http://localhost:3300'),
-    /** Email transport. `console` logs messages instead of sending them. */
-    MAIL_TRANSPORT: z.enum(['console']).default('console'),
+    /**
+     * Email transport. `console` logs messages instead of sending them, which
+     * keeps the demo self-contained; `smtp` sends for real via any provider
+     * that speaks SMTP.
+     */
+    MAIL_TRANSPORT: z.enum(['console', 'smtp']).default('console'),
+    MAIL_FROM: z.string().default('Warehouse OS <no-reply@example.com>'),
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASSWORD: z.string().optional(),
     /** `json` emits one JSON object per log line; defaults to json in production. */
     LOG_FORMAT: z.enum(['pretty', 'json']).optional(),
+    /** Set to an OTLP collector URL to enable distributed tracing. */
+    OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
+    OTEL_SERVICE_NAME: z.string().default('wms-api'),
 
     JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
     JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),

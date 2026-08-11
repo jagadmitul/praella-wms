@@ -147,3 +147,37 @@ export const bulkTransitionSchema = z.object({
   transition: z.string().min(1),
 });
 export type BulkTransitionInput = z.infer<typeof bulkTransitionSchema>;
+
+/**
+ * Replaces the line items on a draft document.
+ *
+ * A whole-set replace rather than per-line add/remove/patch: the client already
+ * holds the complete list, and three endpoints that can each leave the order in
+ * a half-edited state is a worse contract than one that is atomic by
+ * construction.
+ */
+export const replacePurchaseOrderLinesSchema = z
+  .object({
+    items: z.array(purchaseOrderLineSchema).min(1, 'An order needs at least one line'),
+    expectedVersion: z.coerce.number().int().positive().optional(),
+  })
+  .refine(
+    (value) =>
+      new Set(value.items.map((item) => item.productId)).size === value.items.length,
+    { message: 'Each product may only appear once', path: ['items'] },
+  );
+export type ReplacePurchaseOrderLinesInput = z.infer<
+  typeof replacePurchaseOrderLinesSchema
+>;
+
+export const replaceSalesOrderLinesSchema = z
+  .object({
+    items: z.array(salesOrderLineSchema).min(1, 'An order needs at least one line'),
+    expectedVersion: z.coerce.number().int().positive().optional(),
+  })
+  .refine(
+    (value) =>
+      new Set(value.items.map((item) => item.productId)).size === value.items.length,
+    { message: 'Each product may only appear once', path: ['items'] },
+  );
+export type ReplaceSalesOrderLinesInput = z.infer<typeof replaceSalesOrderLinesSchema>;

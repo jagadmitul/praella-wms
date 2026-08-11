@@ -10,6 +10,7 @@ import type { Response } from 'express';
 import { Observable, tap } from 'rxjs';
 import { MetricsService } from '../../observability/metrics.service';
 import { requestContext } from '../../observability/request-context';
+import { annotateSpan } from '../../observability/tracing';
 import type { MaybeAuthenticatedRequest } from '../types/request-context';
 
 /**
@@ -42,6 +43,9 @@ export class RequestIdInterceptor implements NestInterceptor {
 
     request.requestId = requestId;
     response.setHeader('x-request-id', requestId);
+
+    // Joins the trace to the logs and to what the caller saw.
+    annotateSpan(requestId);
 
     const startedAt = process.hrtime.bigint();
 

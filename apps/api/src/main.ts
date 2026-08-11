@@ -8,6 +8,7 @@ import compression from 'compression';
 import express from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { startTracing } from './observability/tracing';
 import { JsonLogger } from './observability/json-logger';
 import { currentRequestId } from './observability/request-context';
 
@@ -19,6 +20,11 @@ import { currentRequestId } from './observability/request-context';
  * call is far more expensive than carrying the prefix from the start.
  */
 async function bootstrap(): Promise<void> {
+  // Instrumentation has to be registered before the modules it patches are
+  // constructed, so this runs first. It is a no-op unless an OTLP endpoint is
+  // configured.
+  const tracing = await startTracing();
+
   // Log lines carry the request's correlation id without any call site
   // needing to pass it.
   JsonLogger.bindRequestContext(currentRequestId);
@@ -85,6 +91,17 @@ async function bootstrap(): Promise<void> {
 
   logger.log(`API listening on http://localhost:${port}/api/v1`);
   logger.log(`Prometheus metrics at http://localhost:${port}/metrics`);
+
+  if (tracing) {
+    logger.log('OpenTelemetry tracing enabled');
+    // Flush buffered spans on shutdown; without this the last few seconds of
+    // traces are lost exactly when something has gone wrong.
+    for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+      process.on(signal, () => {
+        void tracing.shutdown().finally(() => process.exit(0));
+      });
+    }
+  }
   logger.log(`Swagger UI available at http://localhost:${port}/docs`);
 }
 

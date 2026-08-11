@@ -11,6 +11,7 @@ import type {
   PurchaseOrderStatus,
   PurchaseOrderView,
   ReceivePurchaseOrderInput,
+  ReplacePurchaseOrderLinesInput,
   UpdatePurchaseOrderInput,
 } from '@wms/contracts';
 import { PrismaService } from '../prisma/prisma.service';
@@ -214,6 +215,76 @@ export class PurchaseOrdersService {
 
     await this.afterMutation(orgContext, actorId, 'purchase_order.updated', id, {
       code: order.code,
+    });
+
+    return PurchaseOrdersService.toView(updated);
+  }
+
+  /**
+   * Replaces every line on a draft order.
+   *
+   * Only DRAFT orders may be edited: once an order has been submitted the
+   * supplier has seen it, and once anything has been received the lines are
+   * bound to ledger entries that must continue to reconcile.
+   *
+   * @param orgContext - Resolved organisation context.
+   * @param actorId - User performing the edit.
+   * @param id - Purchase order identifier.
+   * @param input - The complete new set of lines.
+   * @returns The updated order.
+   */
+  async replaceLines(
+    orgContext: OrgContext,
+    actorId: string,
+    id: string,
+    input: ReplacePurchaseOrderLinesInput,
+  ): Promise<PurchaseOrderView> {
+    const order = await this.load(orgContext, id);
+    PurchaseOrdersService.assertStatus(order.status as PurchaseOrderStatus, ['DRAFT']);
+    assertVersion('purchase order', order.version, input.expectedVersion);
+
+    const productCount = await this.prisma.product.count({
+      where: {
+        id: { in: input.items.map((item) => item.productId) },
+        organizationId: orgContext.organizationId,
+      },
+    });
+
+    if (productCount !== input.items.length) {
+      throw new BadRequestException('One or more products do not exist in this organisation');
+    }
+
+    const totalAmount = sumMoney(
+      input.items.map((item) => multiplyMoney(item.unitCost, item.quantity)),
+    );
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Delete-then-recreate keeps the operation atomic and avoids diffing
+      // logic that would have to reason about received quantities — which
+      // cannot exist on a DRAFT order anyway.
+      await tx.purchaseOrderItem.deleteMany({ where: { purchaseOrderId: id } });
+
+      return tx.purchaseOrder.update({
+        where: { id },
+        data: {
+          totalAmount,
+          version: { increment: 1 },
+          items: {
+            create: input.items.map((item) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              unitCost: item.unitCost.toFixed(2),
+            })),
+          },
+        },
+        include: PO_INCLUDE,
+      });
+    });
+
+    await this.afterMutation(orgContext, actorId, 'purchase_order.lines_replaced', id, {
+      code: order.code,
+      lines: input.items.length,
+      totalAmount,
     });
 
     return PurchaseOrdersService.toView(updated);
