@@ -1,0 +1,20 @@
+# Keeps the free-tier API container from being suspended.
+#
+# Render suspends a free web service after 15 minutes without traffic, and the
+# next visitor then waits out a cold boot. A liveness ping every 10 minutes
+# costs nothing and keeps the demo instant for a reviewer opening the link.
+name: Keep API warm
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the liveness probe
+        run: |
+          curl --silent --show-error --fail --max-time 90 --retry 3 --retry-delay 15 \
+            https://wms-api-9yar.onrender.com/health

@@ -4,6 +4,13 @@ import { signOutAction } from '@/lib/actions/auth';
 import { getSession } from '@/lib/queries';
 
 /**
+ * Raised from the 15s default because the API container is suspended when idle
+ * and needs up to ~50s to boot; `apiFetch` retries across that window, and the
+ * function has to outlive the retries for that to be worth anything.
+ */
+export const maxDuration = 60;
+
+/**
  * Authenticated shell. The session is fetched once here and its permission list
  * drives the navigation, so every page below can assume a signed-in user.
  */

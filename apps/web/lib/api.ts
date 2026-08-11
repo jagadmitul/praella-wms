@@ -20,6 +20,59 @@ export class ApiError extends Error {
   }
 }
 
+/** Statuses a sleeping or restarting container returns while it wakes up. */
+const COLD_START_STATUSES = new Set([502, 503, 504]);
+
+/** How long to wait before each retry. */
+const RETRY_BACKOFF_MS = [1_000, 3_000, 6_000];
+
+/**
+ * Fetches with a bounded retry for the cold-start window.
+ *
+ * The API runs on a free container that is suspended after a period of
+ * inactivity; the first request in then waits ~30-50s for a boot and comes back
+ * as a 502/503 or a socket error. Without this, the first visit after a quiet
+ * hour renders Next.js's error page even though nothing is actually broken.
+ *
+ * Only retried for reads. Replaying a POST that timed out mid-flight could
+ * receive the same goods twice, and no amount of convenience is worth a
+ * duplicated stock movement.
+ *
+ * @param url - Absolute URL to call.
+ * @param init - Fetch options, including Next.js cache directives.
+ * @param retryable - Whether the request is safe to replay.
+ * @returns The final response, successful or not.
+ */
+async function fetchWithColdStartRetry(
+  url: string,
+  init: RequestInit & { next?: { tags?: string[]; revalidate?: number | false } },
+  retryable: boolean,
+): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= (retryable ? RETRY_BACKOFF_MS.length : 0); attempt += 1) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS[attempt - 1]));
+    }
+
+    try {
+      const response = await fetch(url, init);
+      if (!retryable || !COLD_START_STATUSES.has(response.status)) {
+        return response;
+      }
+      lastError = new ApiError(response.status, 'Upstream unavailable');
+    } catch (error: unknown) {
+      // A refused connection or aborted socket during boot looks like this.
+      lastError = error;
+      if (!retryable) throw error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new ApiError(503, 'The API did not respond');
+}
+
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
@@ -54,19 +107,24 @@ export async function apiFetch<TResponse>(
     redirect('/login');
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: options.method ?? 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-      ...(organizationId ? { 'x-organization-id': organizationId } : {}),
+  const method = options.method ?? 'GET';
+  const response = await fetchWithColdStartRetry(
+    `${API_BASE_URL}${path}`,
+    {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+        ...(organizationId ? { 'x-organization-id': organizationId } : {}),
+      },
+      ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+      next: {
+        ...(options.tags ? { tags: options.tags } : {}),
+        revalidate: options.revalidate ?? 0,
+      },
     },
-    ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
-    next: {
-      ...(options.tags ? { tags: options.tags } : {}),
-      revalidate: options.revalidate ?? 0,
-    },
-  });
+    method === 'GET',
+  );
 
   if (response.status === 401) {
     redirect('/login?reason=expired');
