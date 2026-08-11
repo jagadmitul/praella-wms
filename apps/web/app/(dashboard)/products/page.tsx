@@ -16,7 +16,13 @@ import {
   SortFilter,
 } from '@/components/ui/filters';
 import { createProductAction } from '@/lib/actions/inventory';
-import { getCategories, getProducts, getSession, getSuppliers } from '@/lib/queries';
+import {
+  getCategories,
+  getProducts,
+  getSession,
+  getSuppliers,
+  getWarehouses,
+} from '@/lib/queries';
 import { bulkProductsAction } from '@/lib/actions/bulk';
 import { formatCurrency, formatNumber } from '@/lib/format';
 
@@ -43,7 +49,7 @@ export default async function ProductsPage({
   // Clamped to the API's own cap so a hand-edited URL cannot force a huge scan.
   const pageSize = Math.min(Number(params.pageSize ?? 20) || 20, 100);
 
-  const [session, products, categories, suppliers] = await Promise.all([
+  const [session, products, categories, suppliers, warehouses] = await Promise.all([
     getSession(),
     getProducts({
       search: params.search,
@@ -59,16 +65,27 @@ export default async function ProductsPage({
     }),
     getCategories(),
     getSuppliers(),
+    getWarehouses(),
   ]);
 
   const can = (permission: string) =>
     (session.permissions as string[]).includes(permission);
 
+  // The catalogue itself is organisation-wide — a SKU is not warehouse data —
+  // but the stock rolled up beside it is not. Spelling out how many sites are
+  // in view stops a scoped user reading their partial totals as the whole
+  // company's, which is the one way this page could actually mislead.
+  const visibleSites = warehouses.items.length;
+  const scopeDescription =
+    visibleSites === 1
+      ? `Your catalogue, with stock rolled up across ${warehouses.items[0]?.code ?? 'your site'} — the one warehouse you are assigned to.`
+      : `Your catalogue, with stock rolled up across all ${visibleSites} warehouses you can see.`;
+
   return (
     <>
       <PageHeader
         title="Products"
-        description="Your catalogue, with stock rolled up across every warehouse you can see."
+        description={scopeDescription}
         action={
           can('product:create') ? (
             <DialogForm
