@@ -2,38 +2,19 @@
 
 Multi-tenant warehouse and inventory management: per-warehouse stock, an append-only movement ledger, replenishment thresholds, transfers, purchase and sales orders, fine-grained RBAC, background jobs and a REST API.
 
-Built as the practical test for the **Senior Backend Developer** role at Praella.
+Praella Senior Backend practical test.
 
-| | |
-| --- | --- |
-| **API** | NestJS 11 · 74 REST operations · Swagger at `/docs` |
-| **Dashboard** | Next.js 16 · App Router · Server Components + Server Actions |
-| **Shared** | One Zod package used by both, so validation rules and the RBAC matrix exist exactly once |
-| **Tests** | **160 passing** — 86 integration, 52 API unit, 22 frontend |
-| **UI** | Responsive 375px up · bulk actions · filters, sorting, page size · skeleton loaders |
+**Live:** [praella-wms.vercel.app](https://praella-wms.vercel.app) · **API:** [wms-api-9yar.onrender.com](https://wms-api-9yar.onrender.com/api/v1) · **Swagger:** [/docs](https://wms-api-9yar.onrender.com/docs)
 
-## Live demo
+Sign in as `admin@praella-wms.dev` / `Praella@2026`, then compare with `staff@praella-wms.dev` (same password) — that contrast is the RBAC story in ten seconds.
 
-| | |
-| --- | --- |
-| **Dashboard** | **<https://praella-wms.vercel.app>** |
-| **API** | <https://wms-api-9yar.onrender.com/api/v1> |
-| **Swagger** | <https://wms-api-9yar.onrender.com/docs> |
-| **Health** | <https://wms-api-9yar.onrender.com/health> |
-
-Sign in with `admin@praella-wms.dev` / `Praella@2026`, then compare with
-`staff@praella-wms.dev` — same password — to see the access control.
-
-> The API runs on Render's free tier, which sleeps after 15 minutes idle. The
-> first request may take up to a minute while the container wakes; everything
-> after that is fast. Postgres is Neon and Redis is Render Key Value, both in
-> managed regions.
+> The API is on Render's free tier and sleeps after 15 minutes idle, so the first request may take up to a minute while it wakes.
 
 ---
 
 ## Quick start
 
-**Prerequisites:** Node.js ≥ 22, pnpm ≥ 10, Docker.
+Prerequisites: Node ≥ 22, pnpm ≥ 10, Docker.
 
 ```bash
 cp apps/api/.env.example apps/api/.env
@@ -43,21 +24,23 @@ pnpm bootstrap    # install, build shared package, start Postgres + Redis, migra
 pnpm dev          # API on :4300, dashboard on :3300
 ```
 
-| | |
-| --- | --- |
-| Dashboard | <http://localhost:3300> |
-| Swagger UI | <http://localhost:4300/docs> |
-| Health / metrics | `/health` · `/metrics` |
+Postgres runs on **5437** and Redis on **6381** to avoid clashing with anything already running. Set `REDIS_ENABLED=false` to run without Redis — caching becomes a no-op and `/jobs` is not registered.
 
-> Postgres runs on **5437** and Redis on **6381**, not their defaults, so the stack does not collide with anything already running.
+### Commands
 
-Set `REDIS_ENABLED=false` to run without Redis: caching becomes a no-op and `/jobs` is not registered. Everything else works on Postgres alone.
+```bash
+pnpm build / typecheck / lint
+pnpm test                 # 74 unit + frontend
+pnpm test:e2e             # 86 integration (needs Docker)
+pnpm db:migrate | db:deploy | db:seed | db:studio | db:dump
+pnpm infra:up | infra:down | infra:reset
+```
 
 ---
 
 ## Demo accounts
 
-**Password for every account: `Praella@2026`**
+Password for all: **`Praella@2026`**
 
 | Role | Email | Scope |
 | --- | --- | --- |
@@ -65,120 +48,99 @@ Set `REDIS_ENABLED=false` to run without Redis: caching becomes a no-op and `/jo
 | Manager | `manager@praella-wms.dev` | All operations. No warehouse deletion, no member management |
 | Staff | `staff@praella-wms.dev` | **Surat hub only.** View stock, record movements. No adjustments, no orders |
 | Staff | `staff.mumbai@praella-wms.dev` | **Mumbai DC only** |
-| Admin (2nd tenant) | `admin@northwind-wms.dev` | A separate organisation, proving tenant isolation |
-
-Signing in as **Staff** is the fastest way to see access control working: the sidebar loses entries, the stock page loses its "Adjust stock" and "Set threshold" buttons, and only one warehouse's rows come back.
-
-The seed builds 2 organisations, 5 users, 4 warehouses, 23 products, 375 movements across 30 days (all five movement types), 4 purchase orders, 4 sales orders and 1 transfer — with 8 lines deliberately below threshold.
+| Admin (2nd tenant) | `admin@northwind-wms.dev` | Separate organisation, proving tenant isolation |
 
 ---
 
 ## Tech stack
 
-**Runtime** — Node 22.18 · PostgreSQL 16 · Redis 7.4 · pnpm 10.29 · Turborepo 2.5
+**Runtime** — Node 22.18 · PostgreSQL 16 (Neon 18 in production) · Redis 7.4 · pnpm 10.29 · Turborepo 2.5
 
-**API** (`apps/api`)
+**API** (`apps/api`) — NestJS 11.1 · Prisma 7.9 (`pg` driver adapter) · Zod 4.4 + nestjs-zod 5.5 · @nestjs/swagger 11.4 · @nestjs/jwt 11 + passport-jwt 4 · argon2 0.45 · BullMQ 6 + @nestjs/bullmq 11 · ioredis 5.9 · @nestjs/throttler 6.5 · @nestjs/terminus 11.1 · nodemailer 7 · OpenTelemetry SDK 0.209 · helmet 8.1 · compression 1.8 · Jest 30 + Supertest 7
 
-| Library | Version | Why |
-| --- | --- | --- |
-| NestJS | 11.1 | Modules and guards map cleanly onto RBAC and multi-tenancy |
-| Prisma | 7.9 | Type-safe queries; v7's `pg` driver adapter makes the pool explicit |
-| Zod + nestjs-zod | 4.4 / 5.5 | Validation and OpenAPI generated from one schema |
-| @nestjs/swagger | 11.4 | OpenAPI document + Swagger UI |
-| @nestjs/jwt, passport-jwt | 11.0 / 4.0 | JWT access tokens |
-| argon2 | 0.45 | Password hashing (argon2id) |
-| BullMQ + @nestjs/bullmq | 6.0 / 11.0 | Background queue for bulk stock work |
-| ioredis | 5.9 | Cache and queue transport |
-| @nestjs/throttler, terminus | 6.5 / 11.1 | Rate limiting, health probes |
-| helmet, compression | 8.1 / 1.8 | Security headers, gzip |
-| Jest + Supertest | 30.2 / 7.1 | Unit and integration tests |
+**Dashboard** (`apps/web`) — Next.js 16.3 · React 19.2 · Tailwind CSS 4 · Vitest 3 + React Testing Library 16
 
-**Dashboard** (`apps/web`) — Next.js 16.3 · React 19.2 · Tailwind CSS 4 · Vitest 3 + React Testing Library. UI primitives are hand-rolled (~8 components); a component library plus Radix would have been more surface area than it saved, and native `<dialog>` already gives focus trapping and Escape-to-close.
+**Shared** (`packages/contracts`) — Zod schemas, enums, the RBAC permission matrix and response types, imported by both apps.
 
-**Shared** (`packages/contracts`) — Zod schemas, enums, the RBAC permission matrix, response types.
+UI primitives are hand-rolled (~10 components). A component library plus Radix would have been more surface area than it saved at this size, and native `<dialog>` already provides focus trapping and Escape-to-close.
 
 ---
 
-## Project structure
+## Structure
 
 ```
-apps/api/           NestJS API
-  prisma/           schema (21 models), migrations, deterministic seed
-  src/
-    auth/           sign-up/in, JWT rotation, password reset
-    invitations/    signed invite links
-    cache/          Redis cache, tenant-prefix invalidation
-    catalogue/      categories, suppliers
-    common/         guards, decorators, filters, utils
-    exports/        streamed CSV exports
-    jobs/           BullMQ queue + processor
-    observability/  JSON logging, Prometheus metrics
-    orders/         purchase + sales orders
-    stock/          ledger, levels, movements, replenishment
-    transfers/      warehouse-to-warehouse moves
-  test/             integration specs
-apps/web/           Next.js dashboard (14 routes)
-packages/contracts/ shared Zod schemas + RBAC matrix
-render.yaml         Render blueprint
-scripts/deploy.sh   one-command deploy
-sample-data.sql     generated sample data
+apps/api/            NestJS API — 80 REST operations
+  prisma/            schema (21 models), migrations, deterministic seed
+  src/auth           sign-up/in, JWT rotation, password reset
+      invitations    signed, single-use invite links
+      warehouses     products  catalogue  stock  transfers  orders
+      cache          Redis cache, tenant-prefix invalidation
+      jobs           BullMQ queue + processor
+      exports        streamed CSV
+      observability  JSON logs, Prometheus metrics, OpenTelemetry
+      common         guards, decorators, filters, utils
+  test/              6 integration specs
+apps/web/            Next.js dashboard, 14 routes
+packages/contracts/  shared Zod schemas + RBAC matrix
+render.yaml · scripts/deploy.sh · sample-data.sql
 ```
 
 ---
 
 ## Environment variables
 
-`apps/api/.env` — the app **refuses to boot** if any of these is missing or malformed; `src/config/env.config.ts` validates the whole environment with Zod and reports every problem at once.
+The API **refuses to boot** if any of these is missing or malformed — `src/config/env.config.ts` validates the whole environment with Zod and reports every problem at once.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `PORT` | `4300` | |
-| `DATABASE_URL` | local Postgres on 5437 | |
+| `DATABASE_URL` | local Postgres :5437 | |
 | `TEST_DATABASE_URL` | `…/wms_test` | Created automatically by the e2e suite |
 | `REDIS_ENABLED` | `true` | `false` disables cache and queues entirely |
 | `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6381` | |
 | `QUEUE_PREFIX` | `wms` | Namespaces BullMQ keys per environment |
-| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | dev values | ≥ 32 chars, must differ from each other |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | dev values | ≥ 32 chars, must differ |
 | `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | `900` / `1209600` | Seconds |
-| `THROTTLE_LIMIT` / `AUTH_THROTTLE_LIMIT` | `200` / `10` | Global and auth-route rate limits |
-| `APP_URL` | `http://localhost:3300` | Used to build invite and reset links |
+| `THROTTLE_LIMIT` / `AUTH_THROTTLE_LIMIT` | `200` / `10` | Global and auth-route limits |
+| `APP_URL` | `http://localhost:3300` | Builds invite and reset links |
+| `CORS_ORIGINS` | `http://localhost:3300` | Comma-separated |
 | `MAIL_TRANSPORT` | `console` | `console` logs emails; `smtp` sends via `SMTP_*` |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | — | Required when `MAIL_TRANSPORT=smtp` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | — | Set to enable distributed tracing |
 | `LOG_FORMAT` | json in production | |
-| `CORS_ORIGINS` | `http://localhost:3300` | Comma-separated |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | — | Set to enable distributed tracing |
 
-`apps/web/.env.local` — `API_BASE_URL` only. Server-side; the browser never receives it, and never receives a token either.
+`apps/web/.env.local` needs only `API_BASE_URL`. It is server-side; the browser never receives it, and never receives a token either.
 
 ---
 
-## Commands
+## Sample data
 
-```bash
-pnpm dev / build / typecheck    # all packages via Turborepo
-pnpm test                       # unit + frontend (74)
-pnpm test:e2e                   # integration (86, needs Docker)
+1. **`pnpm db:seed`** — deterministic (seeded PRNG), so every run produces identical data.
+2. **`sample-data.sql`** — ~530 rows across 19 tables as plain `INSERT`s, idempotent and wrapped in a transaction:
+   ```bash
+   pnpm db:deploy && psql "$DATABASE_URL" -f sample-data.sql
+   ```
 
-pnpm infra:up / infra:down / infra:reset
-pnpm db:migrate / db:deploy / db:seed / db:studio / db:dump
-```
+The seed builds 2 organisations, 5 users, 4 warehouses, 23 products, 375 movements over 30 days (all five movement types), 4 purchase orders, 4 sales orders and 1 transfer, with 8 lines below threshold.
+
+It does not invent stock numbers: it generates a chronological ledger and derives every stock level from it, so the signed sum of a product's movements always equals its on-hand quantity — the same invariant the running application maintains.
 
 ---
 
 ## Testing
 
-**160 tests, all passing.** Deliberately weighted towards integration: guard ordering, tenant scoping and transactional stock arithmetic are exactly what a mock-heavy unit test cannot see. Integration specs run the real application against a real PostgreSQL database (`wms_test`, created and migrated automatically) over HTTP.
+**160 tests, all passing** — 86 integration, 52 API unit, 22 frontend.
+
+Weighted towards integration on purpose: guard ordering, tenant scoping and transactional stock arithmetic are exactly what a mock-heavy unit test cannot see. Integration specs run the real application against a real PostgreSQL database (`wms_test`, created and migrated automatically) over HTTP.
 
 | Spec | Covers |
 | --- | --- |
 | `auth` | Password policy, account-enumeration resistance, refresh rotation and reuse detection, error shape |
-| `rbac` | The permission matrix, staff warehouse scoping, cross-tenant isolation, last-admin protection |
+| `rbac` | Permission matrix, staff warehouse scoping, cross-tenant isolation, last-admin protection |
 | `inventory` | CRUD, archive-vs-delete, pagination/search/sort, thresholds, dashboard, health probes |
 | `stock-flows` | Movements, adjustments, **concurrent oversell protection**, transfers, PO receipt, SO allocation and fulfilment |
-| `bulk-jobs` | The BullMQ queue end to end, with per-line error isolation |
-| `rate-limit` | Rate limiting actually returning 429 |
-
-Unit tests cover exact decimal arithmetic, the RFC 4180 CSV parser, pagination helpers, the RBAC matrix invariants and the ledger's guard rails. Frontend tests cover permission-gated navigation, composer line maths, the duplicate-product rule and the formatters.
+| `bulk-jobs` | BullMQ queue end to end with per-line error isolation |
+| `rate-limit` | Rate limiting returning 429 |
 
 The test worth reading:
 
@@ -193,78 +155,42 @@ it('never lets concurrent dispatches drive stock negative', async () => {
 
 ---
 
-## Sample data
+## Design notes
 
-1. **`pnpm db:seed`** — deterministic (seeded PRNG), so every run produces identical data.
-2. **`sample-data.sql`** — ~530 rows across 19 tables as plain `INSERT`s, wrapped in a transaction and idempotent:
-   ```bash
-   pnpm db:deploy && psql "$DATABASE_URL" -f sample-data.sql
-   ```
+**Multi-tenancy.** Every tenant-owned row carries `organizationId`. A global guard resolves the active organisation and attaches it to the request; every query filters on *that*, never on anything from the request body.
 
-The seed does not invent stock numbers. It generates a chronological ledger and derives every stock level from it, so the signed sum of a product's movements in a warehouse always equals its on-hand quantity — the same invariant the running application maintains, asserted in the tests.
-
----
-
-## How it works
-
-### Multi-tenancy
-Every tenant-owned row carries `organizationId`. A global guard resolves the active organisation from the `x-organization-id` header (or the user's sole membership) and attaches it to the request; every query filters on *that*, never on anything from the request body. Cross-tenant access is structurally impossible rather than merely unlikely.
-
-### RBAC
-Roles are bundles of permissions. The matrix lives in `packages/contracts/src/permissions.ts` and is the single source of truth. Guards check **permissions**, not roles:
+**RBAC.** Roles are bundles of permissions. One `resource:action` matrix in `packages/contracts` is the single source of truth, and guards check permissions rather than roles:
 
 ```ts
 @Delete(':id')
 @RequirePermissions('warehouse:delete')   // only ADMIN holds this
 ```
 
-The dashboard imports the same matrix to build its navigation and decide which buttons to render, so the UI can never offer an action the API would reject. `ADMIN` and `MANAGER` see every site; `STAFF` are restricted to their assigned warehouses, enforced in query filters and by an explicit check on every warehouse-targeted write.
+The dashboard imports the same matrix to build its navigation, so the UI cannot offer an action the API would reject. `STAFF` are further restricted to their assigned warehouses.
 
-### The stock ledger
-`StockLevel` holds on-hand and reserved quantity per `(product, warehouse)`. `StockMovement` is append-only — rows are never updated or deleted.
+**Stock is a ledger, not a column.** `StockLevel` holds on-hand and reserved quantity per (product, warehouse); `StockMovement` is append-only. Every stock change in the system passes through one method, `StockLedgerService.applyMovement` — receipts, dispatches, transfers, adjustments and queued jobs all call it. Nothing can change stock without leaving a trace, because no other code path exists. Concurrency uses `SELECT … FOR UPDATE`.
 
-Every stock change in the system passes through one method, `StockLedgerService.applyMovement`. Receipts, dispatches, transfers, manual adjustments and queued bulk jobs all call it, so there is exactly one place that can move a number and exactly one place that writes the matching ledger row. Nothing can change stock without leaving a trace, because no other code path exists.
+**On hand vs. available.** Sales orders separate allocating from shipping (`DRAFT → ALLOCATED → PARTIALLY_FULFILLED → FULFILLED`). Allocation reserves units without moving them, so two orders cannot promise the same last item.
 
-Concurrency uses `SELECT … FOR UPDATE`. Two pickers dispatching the last unit at the same instant serialise on the row lock, so the second sees the first's decrement and is rejected.
+**Transfers** hold goods in transit: stock leaves the source on dispatch and arrives on receipt, so it is correctly absent from both sites in between.
 
-### On hand vs. available
-Sales orders separate *allocating* from *shipping*: `DRAFT → ALLOCATED → PARTIALLY_FULFILLED → FULFILLED`. Allocation reserves units without moving them, so two orders cannot promise the same last item; fulfilment converts the reservation into an outbound movement. A manual dispatch is refused if it would eat into stock another order has reserved.
+**Deleting things with history.** Warehouses and products that carry stock or movement history are archived, not deleted — the ledger references them. Genuinely unused records are deleted outright.
 
-### Transfers
-`DRAFT → IN_TRANSIT → COMPLETED`. Stock leaves the source on dispatch and arrives on receipt, so goods in transit are correctly absent from both sites. A single-step transfer would overstate the destination's availability for as long as the lorry is on the road. Cancelling in transit returns stock to the source.
+**Bulk actions** are deliberately *not* transactional across the set. Ten orders where three are in the wrong state is the normal case; each record is attempted independently and the response names exactly which failed and why.
 
-### Deleting things with history
-Warehouses and products that carry stock or movement history are **archived**, not deleted — the ledger references them. Genuinely unused records are deleted outright. The API reports which it did and the UI shows that message verbatim.
+**Scalability.** Bulk stock jobs (up to 50 000 lines, JSON or CSV) run on BullMQ in chunked transactions. Dashboard and low-stock are cached in Redis per organisation and warehouse scope, invalidated by tenant prefix. Every list is paginated with a hard cap of 100 and sorting restricted to an allow-list.
 
-### Concurrency on documents
-Orders and transfers carry a `version`. An edit echoes the version it read, and a stale write gets a 409 naming both versions rather than silently winning. Optimistic rather than pessimistic, because an order can sit open in a browser tab for an hour and holding a row lock that long is not viable.
+**Security.** Both tokens live in `httpOnly` cookies and never reach client-side JavaScript. Refresh tokens rotate, and replaying a rotated one revokes the family. Invitation and reset tokens are stored only as SHA-256 hashes. Password reset never reveals whether an address exists.
 
-### Scalability
-- **Queues** — bulk stock adjustments (up to 50 000 lines, JSON or CSV) run on BullMQ in chunked transactions. One giant transaction would hold row locks across the catalogue for minutes. A bad line fails only itself and is reported per-line.
-- **Caching** — dashboard and low-stock are cached in Redis per organisation and warehouse scope, invalidated by tenant prefix (`SCAN` + `DEL`) on write. A Redis outage degrades latency, not availability.
-- **Pagination** — every list is paginated with a hard cap of 100, and sorting is restricted to an allow-list so a caller cannot force a scan on an unindexed column.
-
-### Security
-Both tokens live in `httpOnly` cookies and never reach client-side JavaScript; all API calls are made from the Next.js server, and `proxy.ts` refreshes the access token when it nears expiry. Refresh tokens rotate, and replaying a rotated one revokes the whole family. Invitation and reset tokens are stored only as SHA-256 hashes. Password reset never reveals whether an address exists, and completing one revokes every session.
-
-### Observability
-JSON logs carry a correlation id via `AsyncLocalStorage`, so a line written deep in a service matches the `x-request-id` header the caller saw. `/metrics` exposes Prometheus counters and a latency histogram labelled by **route template** rather than concrete path — labelling by `/products/abc123` would mint a time series per product and eventually take Prometheus down.
-
-Distributed tracing is available but **off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set**: the auto-instrumentations patch http, `pg` and `ioredis` at require time, and paying that cost plus a background exporter retrying against a collector that isn't there is the wrong default for a demo. Point it at any OTLP backend and HTTP, Postgres and Redis are traced with no further code, each span tagged with the same request id as the logs.
-
-### Bulk actions
-Row selection with a floating action bar covers products, purchase orders, sales orders and transfers. Bulk operations are deliberately **not** transactional across the set: ten orders where three are in the wrong state is the normal case, and rolling back the seven that worked would be actively unhelpful. Each record is attempted independently and the response names exactly which failed and why.
-
-### Email
-`MailerService` has two transports. `console` (the default) logs messages and sends nothing, so invitations and password resets can be completed end to end with no configuration. `smtp` sends for real through any provider that speaks SMTP — Postmark, SES, Resend, Mailgun or a plain mailbox. SMTP rather than a vendor SDK is one dependency instead of one per provider, and changing provider becomes a change of environment variables.
+**Observability.** JSON logs carry a correlation id via `AsyncLocalStorage`, matching the `x-request-id` header. `/metrics` exposes Prometheus counters and a latency histogram labelled by route *template* — labelling by concrete path would mint a time series per product. OpenTelemetry tracing is available, off unless an OTLP endpoint is configured.
 
 ---
 
 ## API
 
-Swagger UI at `/docs`. All routes under `/api/v1`; send `Authorization: Bearer <token>` and `x-organization-id` when the user belongs to more than one organisation. `/health`, `/health/ready` and `/metrics` are version-neutral so a load balancer needs no reconfiguring when the API goes to v2.
+Swagger at `/docs`. All routes under `/api/v1`; send `Authorization: Bearer <token>`, and `x-organization-id` when the user belongs to more than one organisation. `/health`, `/health/ready` and `/metrics` are version-neutral so a load balancer needs no reconfiguring at v2.
 
-Every failure returns the same body:
+Every failure returns the same shape, with a `requestId` that is echoed in the `x-request-id` header and appears in the logs:
 
 ```json
 {
@@ -273,23 +199,20 @@ Every failure returns the same body:
   "message": "The request body or query string failed validation",
   "details": [{ "path": "unitPrice", "message": "Amount may have at most 2 decimal places" }],
   "path": "/api/v1/products",
-  "timestamp": "2026-08-10T12:04:11.812Z",
+  "timestamp": "2026-08-11T09:04:11.812Z",
   "requestId": "c034dd99-084a-4aea-8695-03e6e6fe7135"
 }
 ```
 
-`requestId` is echoed in the `x-request-id` header and appears in the logs, so a reported failure traces to one log line.
-
 ```bash
-BASE=http://localhost:4300/api/v1
+BASE=https://wms-api-9yar.onrender.com/api/v1
 TOKEN=$(curl -s -X POST $BASE/auth/sign-in -H 'Content-Type: application/json' \
   -d '{"email":"manager@praella-wms.dev","password":"Praella@2026"}' | jq -r .tokens.accessToken)
 
-curl -s $BASE/reports/dashboard    -H "Authorization: Bearer $TOKEN" | jq
-curl -s $BASE/stock/low-stock      -H "Authorization: Bearer $TOKEN" | jq
-curl -s $BASE/exports/products.csv -H "Authorization: Bearer $TOKEN"
+curl -s $BASE/reports/dashboard -H "Authorization: Bearer $TOKEN" | jq
+curl -s $BASE/stock/low-stock   -H "Authorization: Bearer $TOKEN" | jq
 
-# Bulk stock update from a CSV, applied on a background queue
+# Bulk stock update from CSV, applied on a background queue
 curl -s -X POST $BASE/jobs/bulk-stock-adjustments/csv \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: text/csv' \
   --data-binary $'sku,warehouseCode,delta,reason\nELEC-MOU-02,SRT-HUB,5,Cycle count'
@@ -299,118 +222,47 @@ curl -s -X POST $BASE/jobs/bulk-stock-adjustments/csv \
 
 ## Deployment
 
-Both apps ship production Dockerfiles; the repo also carries a Render blueprint and a one-command deploy script.
+Deployed as: Postgres on **Neon**, Redis and the API container on **Render**, dashboard on **Vercel** — all auto-deploying from `main`. The database is deliberately not Render's free tier, which expires after 30 days.
 
 ```bash
-RENDER_API_KEY=rnd_xxx DATABASE_URL=postgresql://... ./scripts/deploy.sh
+RENDER_API_KEY=... DATABASE_URL=postgresql://... ./scripts/deploy.sh
 ```
 
-That migrates and seeds the database, provisions Redis, creates the Render service and deploys the dashboard to Vercel.
-
-**Topology as deployed:** Postgres on **Neon**, Redis and the API container on **Render**, dashboard on **Vercel**, all auto-deploying from `main`. The database is deliberately *not* Render's free tier, which expires after 30 days — the wrong property for a demo someone may open weeks later.
-
-Manual equivalent:
+That migrates, seeds, provisions Redis, creates the Render service and deploys the dashboard. `render.yaml` is also a one-click Blueprint. Both apps have production Dockerfiles:
 
 ```bash
 docker build -f apps/api/Dockerfile -t wms-api .
-docker run -p 4300:4300 \
-  -e DATABASE_URL=... -e REDIS_HOST=... -e REDIS_PORT=... \
-  -e JWT_ACCESS_SECRET=... -e JWT_REFRESH_SECRET=... \
-  -e CORS_ORIGINS=https://your-dashboard -e APP_URL=https://your-dashboard \
-  wms-api
-
 DATABASE_URL=... pnpm --filter @wms/api prisma:deploy   # release step
 ```
 
-**Before going live:** replace both JWT secrets with independent random values ≥ 32 chars, set `NODE_ENV=production` (cookies become `Secure`), point `CORS_ORIGINS` at the real origin, terminate TLS, and run `migrate deploy` — never `migrate dev`.
+Before going live: replace both JWT secrets with independent random values ≥ 32 chars, set `NODE_ENV=production` (cookies become `Secure`), point `CORS_ORIGINS` at the real origin, and run `migrate deploy` — never `migrate dev`.
 
 ---
 
 ## Project summary
 
-### Approach
+**Approach.** I read the brief as asking for an inventory system that could be trusted with stock, not a CRUD app with a `quantity` column. Three decisions followed: stock is an append-only ledger with a single choke point, so nothing can move it without leaving a trace; guards check fine-grained permissions rather than roles, from one matrix shared with the frontend; and every contract — validation, RBAC, response types — is defined once in a shared package that both apps import. Beyond that, multi-tenancy is enforced by a guard rather than by remembering to filter, money is `Decimal` in Postgres and a string on the wire, and concurrency is handled with row locks. I built the API first and drove it from the command line until every flow was correct, then wrote the tests, then the dashboard.
 
-I read the brief as asking for an inventory system that could be trusted with stock, not a CRUD app with a `quantity` column. Three decisions followed and shaped everything else.
+**Liked.** The shared contracts package paid for itself repeatedly — one edit updates the API, the OpenAPI document and the frontend form, and a mismatch is a compile error. The single-choke-point ledger was the highest-leverage decision: once `applyMovement` existed, receipts, transfers, fulfilment and bulk jobs were each about twenty lines and inherited oversell protection and audit history for free.
 
-**1. Stock is a ledger, not a column.** The obvious implementation increments `product.quantity` in place; that number is unauditable the moment anyone disputes it. Instead `StockLevel` holds current quantity per (product, warehouse) and `StockMovement` explains every change. Crucially *every* stock change routes through one method, so it is impossible to move stock without leaving a trace. The seed is built the same way and the tests assert the ledger reconciles.
+**Disliked.** Next.js 16's server/client boundary rules cost real time — a `'use server'` file may only export async functions, and passing a render-prop as `children` across the boundary fails at runtime rather than compile time. Both were quick to fix and slow to diagnose. Prisma's lack of syntax for generated columns also forced a rethink (below).
 
-**2. Permissions, not roles, at the boundary.** The brief asks for fine-grained permissions. Scattering `if (role === 'ADMIN')` works until the fourth role arrives. One `resource:action` matrix in the shared package, guards check permissions, roles are bundles. Adding a role later touches one file — and the dashboard reads the same matrix, so UI and API cannot disagree.
+**Challenges.** Concurrent stock updates are a textbook race; I used `SELECT … FOR UPDATE` and wrote a test that fires ten simultaneous dispatches to prove exactly five win. My first schema gave movements a source/destination pair, which is ambiguous for transfers — "which site's balance changed?" has two answers — so it became a required `warehouseId` plus an optional counterpart. A bulk-job spec that failed one run in four turned out not to be timing at all: the test suite and a running dev server shared one BullMQ queue, so either worker could claim a job while connected to the other's database; queue keys are now namespaced. And `/health` was being served at `/v1/health` because URI versioning applies even to routes excluded from the global prefix.
 
-**3. One definition of every contract.** `packages/contracts` holds the schemas, the matrix and the response types. The API generates DTOs and its OpenAPI document from them; the web app validates forms and types responses with them. No second copy to drift.
+**Time spent.** Roughly 20–22 hours across three sessions: the core build, then closing the pending list, then UI polish and deployment.
 
-Beyond that: multi-tenancy enforced by a guard rather than by remembering to filter; money as `Decimal` in Postgres and a string on the wire; concurrency handled with row locks and proven by a test that fires ten simultaneous dispatches.
-
-I built the API first and drove it from the command line until every flow was correct, then wrote the tests, then the dashboard.
-
-### What I liked
-
-The **shared contracts package** paid for itself repeatedly — changing a validation rule updates the API, the OpenAPI document and the frontend form in one edit, and a mismatch is a compile error rather than a bug report.
-
-The **single-choke-point ledger** was the highest-leverage decision. Once `applyMovement` existed, receipts, transfers, fulfilment and bulk jobs were each about twenty lines and all inherited oversell protection, reservation checks and audit history for free.
-
-**Modelling reservations separately from on-hand stock** was more interesting than expected. It is the difference between "500 in the warehouse" and "500, of which 450 are promised" — and the difference between a system you can and cannot trust to accept an order.
-
-### What I disliked
-
-**Next.js 16's server/client boundary rules cost me real time.** A `'use server'` file may only export async functions, so exporting an `IDLE` constant alongside the actions breaks the module — with an error pointing at the file's last line rather than the offending export. Separately, passing a render-prop as `children` from a Server Component to a Client Component fails at runtime, not compile time. Both were quick to fix once diagnosed and slow to diagnose.
-
-**Render's one-free-database-per-account limit** forced an external Postgres. That turned out better — Render's free database expires after 30 days, which is exactly wrong for a demo link — but it was not the shape I planned.
-
-**The two-decimal money rule is unfashionably strict** and I stand by it, though it does mean a client sending `1.005` gets a 422 rather than silent rounding.
-
-### Challenges
-
-**Concurrent stock updates.** Read-modify-write on a stock level is a textbook race. I used `SELECT … FOR UPDATE` inside the transaction — simple, obviously correct, easy to explain. A conditional `UPDATE … WHERE quantity >= n` is one query cheaper, but expressing "and don't eat into reserved stock" that way gets unreadable fast.
-
-**Attributing a transfer to a warehouse.** My first schema gave movements a source/destination pair. It reads naturally until you ask "which site's balance did this row change?" — for a transfer both are populated and the answer is ambiguous. I caught it writing a reconciliation query that reported six mismatches; the data was fine, my query could not be expressed. Replaced with a required `warehouseId` plus an optional counterpart, reconstructing "from → to" in the view layer.
-
-**A "flaky" test that was really cross-environment contamination.** The bulk-job spec failed about one run in four. Not timing: the test suite and a running dev server shared one BullMQ queue, so either worker could claim a job while connected to the *other* database. Fixed by namespacing queue keys with `QUEUE_PREFIX`, verified by running the suite five times with the dev server deliberately left running.
-
-**Rate limiting versus the test suite.** Overriding the guard does not work, because `APP_GUARD` instantiates it directly rather than resolving the class token. The fix was to make the limit environment-driven — which it should have been anyway — and have the setup raise it for every spec except the one proving rate limiting works.
-
-**Two routes served under the wrong prefix.** `/health` was answering on `/v1/health`, and later `/metrics` had the same problem: URI versioning applies even to routes excluded from the global prefix. Both now use `VERSION_NEUTRAL`. An integration test caught the first; the second I caught only because I went looking after fixing the first.
-
-**A claim in this README that was wrong.** An earlier version stated that Prisma cannot compare two columns, and the low-stock threshold was therefore filtered in JavaScript. Prisma supports field references, and doing it in JS was also a real bug — filtering *after* the page was taken made `totalItems` disagree with the rows returned. Both fixed.
-
-### Deployment notes
-
-Getting the image to build surfaced three bugs worth recording, all caused by the `postinstall` hook that makes a fresh clone work without a manual `prisma generate`:
-
-- `prisma.config.ts` resolved `DATABASE_URL` through Prisma's `env()` helper, which throws as soon as the config file loads. `prisma generate` needs no database, so a missing variable broke both `pnpm install` and the Docker build.
-- The dependency layer ran before the schema was copied, leaving the hook nothing to generate from.
-- The `--prod` prune removes the Prisma CLI and then tried to invoke it, and pnpm refuses to delete a modules directory without a TTY.
-
-The first would have bitten any reviewer who ran `pnpm install` before creating `.env`, so it was worth finding.
-
-### Time spent
-
-**Roughly 16–18 hours**, including a second pass that closed the original pending list.
-
-| | |
-| --- | --- |
-| Schema, migrations, seed | ~2h |
-| Auth, RBAC, multi-tenancy | ~1.5h |
-| Inventory, ledger, transfers, orders | ~2.5h |
-| Queues, caching, reports | ~1h |
-| Invitations, password reset, CSV, observability, concurrency | ~3h |
-| Tests (160) | ~2.5h |
-| Dashboard, composers, responsive | ~3.5h |
-| README, Docker, deployment | ~1.5h |
-
-### Pending items
-
-1. **A generated `is_below_threshold` column — attempted and deliberately reverted.** The threshold comparison already runs in Postgres via a Prisma field reference with a supporting index. A `STORED` generated column plus a partial index is faster still, and I built it — but Prisma has no syntax for generated columns, and models the result as a `DEFAULT`. Every subsequent `prisma migrate dev` then wants to rewrite the column, which would silently break it. Shipping a permanent schema drift that corrupts a column on the reviewer's first migration is worse than the optimisation is worth at this scale, so it came back out. The route forward is raw SQL access with the column excluded from Prisma's model, which is a bigger change than it earns today.
-2. **Editing order lines in the UI.** The API supports it (`PUT /purchase-orders/:id/items`), guarded to DRAFT and version-checked; the dashboard composer still only creates.
-3. **Per-line receiving and fulfilment in the UI.** The API takes partial quantities per line; the dashboard buttons receive or ship in full.
-4. **Deeper frontend tests.** 22 specs cover the highest-risk client logic; page-level Server Components are covered indirectly by the API suite and by browser QA across all three roles at six breakpoints.
-5. **Trace-aware log correlation in the collector.** Spans carry `wms.request_id` and logs carry the same value, but wiring a backend to join them automatically is deployment configuration rather than code.
+**Pending items.**
+1. **Editing order lines in the UI.** The API supports it (`PUT /{purchase,sales}-orders/:id/items`, draft-only and version-checked); the dashboard composer still only creates.
+2. **Per-line receiving and fulfilment in the UI.** The API takes partial quantities per line; the dashboard receives or ships in full.
+3. **Deeper frontend tests.** 22 specs cover the highest-risk client logic; page-level Server Components are covered indirectly by the API suite and by browser QA across all three roles at six breakpoints.
+4. **Trace-to-log correlation in a collector.** Spans carry `wms.request_id` and logs carry the same value; joining them automatically is deployment configuration rather than code.
 
 ---
 
 ## Notes for the reviewer
 
-- Sign in as `staff@praella-wms.dev` and compare with `admin@praella-wms.dev` — that contrast is the whole RBAC story in ten seconds.
+- Sign in as `staff@praella-wms.dev` and compare with `admin@praella-wms.dev` — the sidebar, the buttons and the visible warehouses all change.
 - `pnpm test:e2e` needs Docker; it creates and migrates its own `wms_test` database and never touches development data.
 - Swagger has "Try it out" enabled — sign in, click **Authorize**, paste the access token, and every endpoint is callable from the browser.
-- Invitation and password-reset emails are printed to the API log, so both flows can be completed locally without a mail provider.
+- Invitation and password-reset emails are printed to the API log, so both flows complete locally without a mail provider.
 - The dashboard is responsive from 375 px up; navigation collapses to a drawer below `lg`.
